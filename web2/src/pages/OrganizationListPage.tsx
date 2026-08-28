@@ -62,6 +62,13 @@ export default function OrganizationListPage() {
       ),
     },
     {
+      dataIndex: "userBalance",
+      title: i18next.t("organization:User balance"),
+      width: 130,
+      sortable: true,
+      render: (value, record) => Setting.getPriceDisplay(value ?? 0, record.balanceCurrency),
+    },
+    {
       dataIndex: "balanceCredit",
       title: i18next.t("organization:Balance credit"),
       width: 130,
@@ -76,6 +83,7 @@ export default function OrganizationListPage() {
     <CrudListPage
       title={i18next.t("general:Organizations")}
       columns={columns}
+      formType="organizations"
       rowKey={(row) => row.name}
       fetch={(query) =>
         OrganizationBackend.getOrganizations(

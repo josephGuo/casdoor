@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import * as React from "react";
-import {Navigate, Route, Routes, useLocation} from "react-router-dom";
+import {Navigate, Route, Routes, useLocation, useNavigate} from "react-router-dom";
 import {Loading} from "@/components/common/Loading";
 import {AppLayout} from "@/components/layout/AppLayout";
 import {useAccount} from "@/hooks/use-account";
@@ -27,6 +27,7 @@ const NotFoundPage = React.lazy(() => import("@/pages/NotFoundPage"));
 const AppListPage = React.lazy(() => import("@/pages/AppListPage"));
 const ShortcutsPage = React.lazy(() => import("@/pages/ShortcutsPage"));
 const AccountPage = React.lazy(() => import("@/pages/AccountPage"));
+const MfaSetupPage = React.lazy(() => import("@/pages/auth/MfaSetupPage"));
 const SystemInfoPage = React.lazy(() => import("@/pages/SystemInfoPage"));
 
 const OrganizationListPage = React.lazy(() => import("@/pages/OrganizationListPage"));
@@ -64,6 +65,7 @@ const AgentListPage = React.lazy(() => import("@/pages/AgentListPage"));
 const AgentEditPage = React.lazy(() => import("@/pages/AgentEditPage"));
 const ServerListPage = React.lazy(() => import("@/pages/ServerListPage"));
 const ServerEditPage = React.lazy(() => import("@/pages/ServerEditPage"));
+const ServerStorePage = React.lazy(() => import("@/pages/ServerStorePage"));
 const EntryListPage = React.lazy(() => import("@/pages/EntryListPage"));
 const EntryEditPage = React.lazy(() => import("@/pages/EntryEditPage"));
 const SiteListPage = React.lazy(() => import("@/pages/SiteListPage"));
@@ -95,6 +97,7 @@ const TransactionListPage = React.lazy(() => import("@/pages/TransactionListPage
 const TransactionEditPage = React.lazy(() => import("@/pages/TransactionEditPage"));
 
 const FormListPage = React.lazy(() => import("@/pages/FormListPage"));
+const FormEditPage = React.lazy(() => import("@/pages/FormEditPage"));
 const SyncerListPage = React.lazy(() => import("@/pages/SyncerListPage"));
 const SyncerEditPage = React.lazy(() => import("@/pages/SyncerEditPage"));
 const WebhookListPage = React.lazy(() => import("@/pages/WebhookListPage"));
@@ -121,6 +124,31 @@ Auth.initAuthWithConfig({
   appName: Conf.DefaultApplication,
 });
 
+/**
+ * When the organization marks an MFA item as "Required" and the user has not set
+ * it up yet, Casdoor parks them on the setup wizard right after sign-in.
+ */
+function useRequiredMfaRedirect() {
+  const {account} = useAccount();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  React.useEffect(() => {
+    if (!account || location.pathname.startsWith("/mfa/setup")) {
+      return;
+    }
+    if (!Setting.isRequiredEnableMfa(account, account.organization)) {
+      return;
+    }
+    const mfaType = Setting.getMfaItemsByRules(account, account.organization, [Setting.MfaRuleRequired]).find(
+      (item: any) => item.rule === Setting.MfaRuleRequired,
+    )?.name;
+    if (mfaType !== undefined) {
+      navigate(`/mfa/setup?mfaType=${mfaType}`, {state: {from: "/login"}});
+    }
+  }, [account, navigate, location.pathname]);
+}
+
 /** Sends anonymous visitors to the sign-in page of their organization. */
 function RequireAuth({children}: {children: React.ReactNode}) {
   const {account, loading} = useAccount();
@@ -138,6 +166,8 @@ function RequireAuth({children}: {children: React.ReactNode}) {
 }
 
 export default function App() {
+  useRequiredMfaRedirect();
+
   return (
     <React.Suspense fallback={<Loading className="min-h-screen" />}>
       <Routes>
@@ -173,6 +203,7 @@ export default function App() {
           <Route path="/apps" element={<AppListPage />} />
           <Route path="/shortcuts" element={<ShortcutsPage />} />
           <Route path="/account" element={<AccountPage />} />
+          <Route path="/mfa/setup" element={<MfaSetupPage />} />
           <Route path="/sysinfo" element={<SystemInfoPage />} />
 
           <Route path="/organizations" element={<OrganizationListPage />} />
@@ -212,6 +243,7 @@ export default function App() {
           <Route path="/agents/:organizationName/:agentName" element={<AgentEditPage />} />
           <Route path="/servers" element={<ServerListPage />} />
           <Route path="/servers/:organizationName/:serverName" element={<ServerEditPage />} />
+          <Route path="/server-store" element={<ServerStorePage />} />
           <Route path="/entries" element={<EntryListPage />} />
           <Route path="/entries/:organizationName/:entryName" element={<EntryEditPage />} />
           <Route path="/sites" element={<SiteListPage />} />
@@ -243,6 +275,7 @@ export default function App() {
           <Route path="/transactions/:organizationName/:transactionName" element={<TransactionEditPage />} />
 
           <Route path="/forms" element={<FormListPage />} />
+          <Route path="/forms/:formName" element={<FormEditPage />} />
           <Route path="/syncers" element={<SyncerListPage />} />
           <Route path="/syncers/:organizationName/:syncerName" element={<SyncerEditPage />} />
           <Route path="/webhooks" element={<WebhookListPage />} />

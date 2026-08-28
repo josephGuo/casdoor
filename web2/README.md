@@ -65,6 +65,18 @@ sign up from `signupItems`, forgot password, `/callback` (OAuth, OIDC, SAML POST
 binding, CAS, Telegram, Steam, Web3 token key), MFA second factor + recovery
 code, consent, prompt, result.
 
+**Captcha** — the full rule handling of the antd frontend (`Never` / `Always` /
+`Dynamic` / `Internet-Only`), as a dialog or inline in the sign-in form, for both
+sign-in/sign-up and the "Get Code" button. Default (image), reCAPTCHA v2/v3,
+hCaptcha, Aliyun, GEETEST and Cloudflare Turnstile all mount through the same
+`CaptchaWidget` port, so the tokens the backend validates are unchanged.
+
+**MFA** — `/mfa/setup` is a three-step wizard (verify password → verify the
+factor → enable + recovery code) covering SMS, email, TOTP (QR + secret), RADIUS
+and push. An organization that marks a factor `Required` redirects the user there
+right after sign-in, and the user page can set the preferred factor or remove
+MFA.
+
 **Console** — dashboard, apps, shortcuts, my account, system info, and list +
 edit pages for: organizations, users, groups (incl. tree), invitations,
 applications, providers, resources, certs, keys, roles, permissions, models,
@@ -78,17 +90,19 @@ tickets, LDAP (edit + sync).
 These exist in `../web` and still need work here:
 
 - **Login extras**: WebAuthn, Face ID, Web3/MetaMask, WeChat QR panel, Telegram
-  widget, captcha modal/inline widget, device-login panel, `/mfa/setup`.
+  widget, device-login panel.
 - **Storefront & checkout**: product store, server (MCP) store, cart, product
   buy, order pay, payment result, `/select-plan` and `/buy-plan` pricing pages,
   `/qrcode`.
 - **Editors/viewers**: form editor (`/forms/:name`), Casbin policy editor on the
   adapter page, enforcer tester, OpenClaw session graph & transcript viewers,
   SELinux entry viewer.
-- **Edit-page extras**: application import/export, resource upload, organization
-  theme editor and navbar/widget item trees, and some sub-tables (token
-  attributes, custom scopes, IP/WAF/UA rules, managed & MFA accounts, addresses,
-  WebAuthn credentials).
+- **Edit-page extras**: application import/export, resource upload, and the
+  IP/WAF/UA rule sub-tables of the rule pages. Every other field of every ported
+  edit page is present (509/509), and the list pages carry every column the antd
+  ones did — the navbar/widget item trees are multi-selects rather than trees,
+  and the theme editor is a colour/radius/compact form rather than
+  antd-token-previewer.
 - **Chrome**: the product tour, the AI assistant drawer, and the GitHub corner.
 
 Everything above degrades to a normal 404 inside the console rather than

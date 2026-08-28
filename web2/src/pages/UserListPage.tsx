@@ -107,6 +107,14 @@ export default function UserListPage() {
       sortable: true,
       render: (value, record) => Setting.getPriceDisplay(value ?? 0, record.balanceCurrency),
     },
+    {
+      dataIndex: "balanceCredit",
+      title: i18next.t("organization:Balance credit"),
+      width: 130,
+      sortable: true,
+      render: (value, record) => Setting.getPriceDisplay(value ?? 0, record.balanceCurrency),
+    },
+    textColumn({dataIndex: "balanceCurrency", title: i18next.t("organization:Balance currency"), width: 130}),
     boolColumn({dataIndex: "isAdmin", title: i18next.t("user:Is admin")}),
     boolColumn({dataIndex: "isForbidden", title: i18next.t("user:Is forbidden"), invertColor: true}),
     boolColumn({dataIndex: "isDeleted", title: i18next.t("user:Is deleted"), invertColor: true}),
@@ -117,6 +125,7 @@ export default function UserListPage() {
       title={i18next.t("general:Users")}
       description={groupName ? `${i18next.t("general:Groups")}: ${groupName}` : undefined}
       columns={columns}
+      formType="users"
       deps={[organizationName, groupName, isGlobal]}
       fetch={(q) =>
         isGlobal
@@ -151,7 +160,7 @@ export default function UserListPage() {
               });
             }}
           >
-            {i18next.t("user:Impersonate")}
+            {i18next.t("general:Impersonate")}
           </Button>
         ) : null
       }
