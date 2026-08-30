@@ -80,6 +80,11 @@ const TokenEditPage = React.lazy(() => import("@/pages/TokenEditPage"));
 const VerificationListPage = React.lazy(() => import("@/pages/VerificationListPage"));
 
 const ProductListPage = React.lazy(() => import("@/pages/ProductListPage"));
+const ProductStorePage = React.lazy(() => import("@/pages/ProductStorePage"));
+const ProductBuyPage = React.lazy(() => import("@/pages/ProductBuyPage"));
+const CartListPage = React.lazy(() => import("@/pages/CartListPage"));
+const OrderPayPage = React.lazy(() => import("@/pages/OrderPayPage"));
+const PaymentResultPage = React.lazy(() => import("@/pages/PaymentResultPage"));
 const ProductEditPage = React.lazy(() => import("@/pages/ProductEditPage"));
 const CouponListPage = React.lazy(() => import("@/pages/CouponListPage"));
 const CouponEditPage = React.lazy(() => import("@/pages/CouponEditPage"));
@@ -115,7 +120,13 @@ const ForgetPage = React.lazy(() => import("@/pages/auth/ForgetPage"));
 const AuthCallback = React.lazy(() => import("@/pages/auth/AuthCallback"));
 const ResultPage = React.lazy(() => import("@/pages/auth/ResultPage"));
 const ConsentPage = React.lazy(() => import("@/pages/auth/ConsentPage"));
+const PricingPage = React.lazy(() => import("@/pages/PricingPage"));
+const QrCodePage = React.lazy(() => import("@/pages/QrCodePage"));
 const PromptPage = React.lazy(() => import("@/pages/auth/PromptPage"));
+const TelegramLogin = React.lazy(() => import("@/pages/auth/TelegramLogin"));
+const CasLogout = React.lazy(() => import("@/pages/auth/CasLogout"));
+const CaptchaPage = React.lazy(() => import("@/pages/auth/CaptchaPage"));
+const OidcDiscoveryPage = React.lazy(() => import("@/pages/auth/OidcDiscoveryPage"));
 
 Setting.initServerUrl();
 Setting.initWebConfig();
@@ -178,6 +189,7 @@ export default function App() {
         <Route path="/login/oauth/device/:userCode" element={<LoginPage type="device" />} />
         <Route path="/login/saml/authorize/:owner/:applicationName" element={<LoginPage type="saml" />} />
         <Route path="/cas/:owner/:casApplicationName/login" element={<LoginPage type="cas" />} />
+        <Route path="/cas/:owner/:casApplicationName/logout" element={<CasLogout />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/signup/:applicationName" element={<SignupPage />} />
         <Route path="/signup/oauth/authorize" element={<SignupPage />} />
@@ -185,11 +197,20 @@ export default function App() {
         <Route path="/forget/:applicationName" element={<ForgetPage />} />
         <Route path="/callback" element={<AuthCallback />} />
         <Route path="/callback/saml" element={<AuthCallback />} />
+        <Route path="/telegram-login" element={<TelegramLogin />} />
+        <Route path="/captcha" element={<CaptchaPage />} />
+        <Route path="/.well-known/openid-configuration" element={<OidcDiscoveryPage />} />
         <Route path="/consent/:applicationName" element={<ConsentPage />} />
         <Route path="/prompt" element={<PromptPage />} />
         <Route path="/prompt/:applicationName" element={<PromptPage />} />
         <Route path="/result" element={<ResultPage />} />
         <Route path="/result/:applicationName" element={<ResultPage />} />
+
+        {/* Pricing / checkout pages reachable without the console chrome */}
+        <Route path="/select-plan/:owner/:pricingName" element={<PricingPage />} />
+        <Route path="/buy-plan/:owner/:pricingName" element={<ProductBuyPage />} />
+        <Route path="/buy-plan/:owner/:pricingName/result" element={<PaymentResultPage />} />
+        <Route path="/qrcode/:owner/:paymentName" element={<QrCodePage />} />
 
         {/* Console */}
         <Route
@@ -257,14 +278,19 @@ export default function App() {
           <Route path="/tokens/:tokenName" element={<TokenEditPage />} />
           <Route path="/verifications" element={<VerificationListPage />} />
 
+          <Route path="/product-store" element={<ProductStorePage />} />
           <Route path="/products" element={<ProductListPage />} />
           <Route path="/products/:organizationName/:productName" element={<ProductEditPage />} />
+          <Route path="/products/:organizationName/:productName/buy" element={<ProductBuyPage />} />
+          <Route path="/cart" element={<CartListPage />} />
           <Route path="/coupons" element={<CouponListPage />} />
           <Route path="/coupons/:organizationName/:couponName" element={<CouponEditPage />} />
           <Route path="/orders" element={<OrderListPage />} />
           <Route path="/orders/:organizationName/:orderName" element={<OrderEditPage />} />
+          <Route path="/orders/:organizationName/:orderName/pay" element={<OrderPayPage />} />
           <Route path="/payments" element={<PaymentListPage />} />
           <Route path="/payments/:organizationName/:paymentName" element={<PaymentEditPage />} />
+          <Route path="/payments/:organizationName/:paymentName/result" element={<PaymentResultPage />} />
           <Route path="/plans" element={<PlanListPage />} />
           <Route path="/plans/:organizationName/:planName" element={<PlanEditPage />} />
           <Route path="/pricings" element={<PricingListPage />} />
