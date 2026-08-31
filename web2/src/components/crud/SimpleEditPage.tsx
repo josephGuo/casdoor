@@ -5,6 +5,7 @@ import {Input} from "@/components/ui/input";
 import {Switch} from "@/components/ui/switch";
 import {Textarea} from "@/components/ui/textarea";
 import {Loading} from "@/components/common/Loading";
+import {UnauthorizedPage} from "@/components/common/UnauthorizedPage";
 import {MultiSelect, type MultiSelectOption} from "@/components/common/MultiSelect";
 import {SearchableSelect, type SearchableOption} from "@/components/common/SearchableSelect";
 import {TagsInput} from "@/components/common/TagsInput";
@@ -12,7 +13,7 @@ import {CodeEditor} from "@/components/common/CodeEditor";
 import {EditPageShell} from "@/components/crud/EditPageShell";
 import {FormRow} from "@/components/crud/FormRow";
 import {useEditRecord} from "@/hooks/use-edit-record";
-import {submitEdit, type CasdoorResponse, type EditMode} from "@/lib/crud";
+import {getModeTitleKey, submitEdit, type CasdoorResponse, type EditMode} from "@/lib/crud";
 import * as Setting from "@/lib/setting";
 
 type Ctx = {record: any; mode: EditMode; reload: () => void};
@@ -42,7 +43,7 @@ export type EditField =
   | (BaseField & {type: "number"; step?: string})
   | (BaseField & {type: "textarea"; rows?: number; placeholder?: string})
   | (BaseField & {type: "switch"})
-  | (BaseField & {type: "tags"})
+  | (BaseField & {type: "tags"; placeholder?: string})
   | (BaseField & {type: "select"; options: (ctx: Ctx) => SearchableOption[]})
   | (BaseField & {type: "multiselect"; options: (ctx: Ctx) => MultiSelectOption[]; creatable?: boolean})
   | (BaseField & {type: "code"; language?: string; height?: number})
@@ -90,7 +91,11 @@ export function SimpleEditPage({
 }: SimpleEditPageProps) {
   const navigate = useNavigate();
   const [saving, setSaving] = React.useState(false);
-  const {record, updateField, updateFields, loading, mode, setMode, reload} = useEditRecord<any>({fetch, transform, deps});
+  const {record, updateField, updateFields, loading, denied, mode, setMode, reload} = useEditRecord<any>({fetch, transform, deps});
+
+  if (denied) {
+    return <UnauthorizedPage />;
+  }
 
   if (loading || record === null) {
     return <Loading />;
@@ -129,7 +134,8 @@ export function SimpleEditPage({
       return null;
     }
     const value = record[field.name];
-    const disabled = field.disabled ? field.disabled(ctx) : false;
+    // a read-only page locks the whole form, whatever each field asked for
+    const disabled = mode === "view" || (field.disabled ? field.disabled(ctx) : false);
     const set = (next: any) =>
       field.onChange ? field.onChange(next, ctx, updateFields) : updateField(field.name, next);
 
@@ -164,7 +170,12 @@ export function SimpleEditPage({
       break;
     case "tags":
       control = (
-        <TagsInput disabled={disabled} value={value ?? []} onChange={(v) => set(v)} />
+        <TagsInput
+          disabled={disabled}
+          value={value ?? []}
+          onChange={(v) => set(v)}
+          placeholder={field.placeholder}
+        />
       );
       break;
     case "select":
@@ -226,7 +237,7 @@ export function SimpleEditPage({
 
   return (
     <EditPageShell
-      title={`${i18next.t(titleKey)} - ${record.displayName || record.name}`}
+      title={`${i18next.t(getModeTitleKey(titleKey, mode))} - ${record.displayName || record.name}`}
       mode={mode}
       backTo={backTo}
       onSave={save}

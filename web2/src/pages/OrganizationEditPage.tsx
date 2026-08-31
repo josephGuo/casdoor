@@ -2,6 +2,7 @@ import * as React from "react";
 import i18next from "i18next";
 import {Link, useNavigate, useParams} from "react-router-dom";
 import {Link as LinkIcon} from "lucide-react";
+import {UnauthorizedPage} from "@/components/common/UnauthorizedPage";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Switch} from "@/components/ui/switch";
@@ -18,7 +19,7 @@ import {EditableTable} from "@/components/crud/EditableTable";
 import {FormRow} from "@/components/crud/FormRow";
 import {useAccount} from "@/hooks/use-account";
 import {useEditRecord} from "@/hooks/use-edit-record";
-import {submitEdit} from "@/lib/crud";
+import {getModeTitleKey, submitEdit} from "@/lib/crud";
 import * as ApplicationBackend from "@/backend/ApplicationBackend";
 import * as LdapBackend from "@/backend/LdapBackend";
 import {ConfirmButton} from "@/components/common/ConfirmButton";
@@ -30,7 +31,12 @@ const TOKEN_FORMATS = ["JWT", "JWT-Empty", "JWT-Custom", "JWT-Standard"];
 const OBFUSCATOR_TYPES = ["Plain", "AES", "DES"];
 const VIEW_RULES = ["Public", "Self", "Admin"];
 const MODIFY_RULES = ["Self", "Admin", "Immutable"];
-const MFA_RULES = ["Optional", "Prompted", "Required"];
+/** `general:Optional` and friends do not exist; the antd table uses these. */
+const MFA_RULES: Record<string, string> = {
+  "Optional": "organization:Optional",
+  "Prompted": "organization:Prompt",
+  "Required": "organization:Required",
+};
 
 function passwordOptions() {
   return [
@@ -55,7 +61,7 @@ export default function OrganizationEditPage() {
   const [applications, setApplications] = React.useState<any[]>([]);
   const [ldaps, setLdaps] = React.useState<any[] | null>(null);
 
-  const {record: organization, setRecord, updateField, loading, mode, setMode} = useEditRecord<any>({
+  const {record: organization, setRecord, updateField, loading, denied, mode, setMode} = useEditRecord<any>({
     fetch: () => OrganizationBackend.getOrganization("admin", organizationName),
     transform: (org) => ({...org, enableDarkLogo: !!org.logoDark}),
     deps: [organizationName],
@@ -91,6 +97,10 @@ export default function OrganizationEditPage() {
         }
       })
       .catch((error) => Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${error}`));
+
+  if (denied) {
+    return <UnauthorizedPage />;
+  }
 
   if (loading || organization === null) {
     return <Loading />;
@@ -142,7 +152,7 @@ export default function OrganizationEditPage() {
 
   return (
     <EditPageShell
-      title={`${i18next.t("organization:Edit Organization")} - ${organization.displayName || organization.name}`}
+      title={`${i18next.t(getModeTitleKey("organization:Edit Organization", mode))} - ${organization.displayName || organization.name}`}
       mode={mode}
       backTo="/organizations"
       onSave={save}
@@ -370,8 +380,18 @@ export default function OrganizationEditPage() {
                   render: (row: any, _index, patch) => (
                     <SelectField
                       value={row.rule}
-                      onChange={(value) => patch({rule: value})}
-                      options={MFA_RULES.map((item) => ({id: item, name: i18next.t(`general:${item}`)}))}
+                      onChange={(value) => {
+                        // exactly one factor may be mandatory, as the antd table enforces
+                        const required = (organization.mfaItems ?? []).filter(
+                          (item: any) => item.rule === "Required",
+                        ).length;
+                        if (value === "Required" && required >= 1 && row.rule !== "Required") {
+                          Setting.showMessage("error", i18next.t("general:Only 1 MFA method can be required"));
+                          return;
+                        }
+                        patch({rule: value});
+                      }}
+                      options={Object.entries(MFA_RULES).map(([id, key]) => ({id, name: i18next.t(key)}))}
                     />
                   ),
                 },
@@ -463,13 +483,26 @@ export default function OrganizationEditPage() {
             />
           </FormRow>
           <FormRow labelKey="organization:Has privilege consent">
-            <Switch
-              checked={!!organization.hasPrivilegeConsent}
-              onCheckedChange={(v) => update("hasPrivilegeConsent", v)}
-            />
+            {/* granting it is the dangerous direction, so only that one asks */}
+            {organization.hasPrivilegeConsent ? (
+              <Switch checked onCheckedChange={(v) => update("hasPrivilegeConsent", v)} />
+            ) : (
+              <ConfirmButton
+                variant="ghost"
+                size="iconSm"
+                destructive={false}
+                title={i18next.t("organization:Has privilege consent warning")}
+                onConfirm={() => update("hasPrivilegeConsent", true)}
+              >
+                <Switch checked={false} className="pointer-events-none" />
+              </ConfirmButton>
+            )}
           </FormRow>
           <FormRow labelKey="general:IP whitelist">
-            <TagsInput value={organization.ipWhitelist ?? []} onChange={(value) => update("ipWhitelist", value)} />
+            <Input
+              value={organization.ipWhitelist ?? ""}
+              onChange={(e) => update("ipWhitelist", e.target.value)}
+            />
           </FormRow>
           <FormRow labelKey="organization:Init score">
             <Input
@@ -512,6 +545,10 @@ export default function OrganizationEditPage() {
               value={organization.orgBalance ?? 0}
               onChange={(e) => update("orgBalance", Number(e.target.value))}
             />
+          </FormRow>
+          <FormRow labelKey="organization:User balance">
+            {/* maintained by the backend, the antd page shows it read-only too */}
+            <Input type="number" value={organization.userBalance ?? 0} disabled />
           </FormRow>
           <FormRow labelKey="organization:Account menu">
             <SelectField

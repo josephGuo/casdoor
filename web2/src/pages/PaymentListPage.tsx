@@ -1,6 +1,7 @@
 import i18next from "i18next";
 import {Link} from "react-router-dom";
 import {Badge} from "@/components/ui/badge";
+import {Button} from "@/components/ui/button";
 import {CrudListPage} from "@/components/crud/CrudListPage";
 import {dateColumn, linkColumn, organizationColumn, tagsColumn, textColumn} from "@/components/crud/columns";
 import type {ColumnDef} from "@/components/crud/types";
@@ -16,6 +17,8 @@ const stateVariant = (state: string) =>
 export default function PaymentListPage() {
   const {account} = useAccount();
   const organizationName = useRequestOrganization();
+  // the antd list pages let a non-admin look but not touch these
+  const readOnly = !Setting.isLocalAdminUser(account);
 
   const columns: ColumnDef<any>[] = [
     linkColumn({dataIndex: "name", to: (r) => `/payments/${r.owner}/${r.name}`, width: 180}),
@@ -35,10 +38,16 @@ export default function PaymentListPage() {
         ) : null,
     },
     dateColumn(),
-    textColumn({dataIndex: "type", title: i18next.t("general:Type"), width: 120}),
+    textColumn({
+      dataIndex: "type",
+      title: i18next.t("general:Type"),
+      width: 120,
+      filters: Setting.getProviderTypeOptions("Payment").map((option: any) => ({value: option.name, label: option.id})),
+    }),
     tagsColumn({dataIndex: "products", title: i18next.t("general:Products"), width: 200}),
     {
       dataIndex: "price",
+      searchable: true,
       title: i18next.t("order:Price"),
       width: 120,
       sortable: true,
@@ -46,6 +55,7 @@ export default function PaymentListPage() {
     },
     {
       dataIndex: "state",
+      searchable: true,
       title: i18next.t("general:State"),
       width: 110,
       sortable: true,
@@ -62,6 +72,13 @@ export default function PaymentListPage() {
         PaymentBackend.getPayments(organizationName, q.page, q.pageSize, q.searchedColumn, q.searchText, q.sortField, q.sortOrder)
       }
       newRecord={account ? () => newPayment(account) : undefined}
+      readOnly={readOnly}
+      actionColumnWidth={240}
+      rowActions={(record) => (
+        <Button variant="outline" size="sm" asChild>
+          <Link to={`/payments/${record.owner}/${record.name}/result`}>{i18next.t("payment:Result")}</Link>
+        </Button>
+      )}
       editUrl={(r) => `/payments/${r.owner}/${r.name}`}
       remove={(r) => PaymentBackend.deletePayment(r)}
     />

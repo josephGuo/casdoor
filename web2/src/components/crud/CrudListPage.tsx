@@ -3,7 +3,9 @@ import i18next from "i18next";
 import {Plus, RefreshCw} from "lucide-react";
 import {useNavigate} from "react-router-dom";
 import {Button} from "@/components/ui/button";
+import {Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip";
 import {ConfirmButton} from "@/components/common/ConfirmButton";
+import {UnauthorizedPage} from "@/components/common/UnauthorizedPage";
 import {DataTable} from "@/components/crud/DataTable";
 import {PageHeader} from "@/components/crud/PageHeader";
 import type {ColumnDef, CasdoorListResponse, TableQuery} from "@/components/crud/types";
@@ -45,6 +47,17 @@ export interface CrudListPageProps<T extends Record<string, any>> {
   formType?: string;
   /** set to false for read-only lists such as Sessions or Records */
   showActionColumn?: boolean;
+  /**
+   * The signed-in user may look but not touch: the row action becomes "View"
+   * and opens the edit page in its read-only mode, and Add and Delete are
+   * disabled. The antd list pages do this for anyone who is not a local admin.
+   */
+  readOnly?: boolean;
+  /**
+   * Blocks Delete for one row and explains why, shown as a tooltip. The antd
+   * group list uses it for a group that still has subgroups.
+   */
+  deleteDisabled?: (record: T) => string | false | undefined;
   actionColumnWidth?: number | string;
 }
 
@@ -66,9 +79,11 @@ export function CrudListPage<T extends Record<string, any>>({
   formType,
   showActionColumn = true,
   actionColumnWidth = 180,
+  readOnly = false,
+  deleteDisabled,
 }: CrudListPageProps<T>) {
   const navigate = useNavigate();
-  const {rows, total, loading, query, setQuery, refresh} = useTableData<T>(fetch, deps, initialQuery);
+  const {rows, total, loading, denied, query, setQuery, refresh} = useTableData<T>(fetch, deps, initialQuery);
   const [adding, setAdding] = React.useState(false);
 
   const handleAdd = async() => {
@@ -114,6 +129,33 @@ export function CrudListPage<T extends Record<string, any>>({
 
   const formItems = useFormItems(formType);
 
+  const renderDelete = (record: T) => {
+    const blockedReason = deleteDisabled?.(record);
+    const button = (
+      <ConfirmButton
+        variant="destructive"
+        size="sm"
+        disabled={readOnly || Boolean(blockedReason)}
+        description={`${record.name ?? ""}`}
+        onConfirm={() => handleDelete(record)}
+      >
+        {i18next.t("general:Delete")}
+      </ConfirmButton>
+    );
+    if (!blockedReason) {
+      return button;
+    }
+    // a disabled button swallows pointer events, so the tooltip hangs off a wrapper
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">{button}</span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-sm">{blockedReason}</TooltipContent>
+      </Tooltip>
+    );
+  };
+
   const allColumns = React.useMemo<ColumnDef<T>[]>(() => {
     const visibleColumns = Setting.filterTableColumns(columns, formItems) as ColumnDef<T>[];
     if (!showActionColumn) {
@@ -130,26 +172,27 @@ export function CrudListPage<T extends Record<string, any>>({
           <div className="flex flex-wrap items-center gap-1">
             {rowActions?.(record, index, {refresh})}
             {editUrl ? (
-              <Button variant="outline" size="sm" onClick={() => navigate(editUrl(record))}>
-                {i18next.t("general:Edit")}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  navigate(editUrl(record), readOnly ? {state: {mode: "view"}} : undefined)
+                }
+              >
+                {i18next.t(readOnly ? "general:View" : "general:Edit")}
               </Button>
             ) : null}
-            {remove ? (
-              <ConfirmButton
-                variant="destructive"
-                size="sm"
-                description={`${record.name ?? ""}`}
-                onConfirm={() => handleDelete(record)}
-              >
-                {i18next.t("general:Delete")}
-              </ConfirmButton>
-            ) : null}
+            {remove ? renderDelete(record) : null}
           </div>
         ),
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columns, formItems, editUrl, remove, rowActions, showActionColumn, rows, query.page, refresh]);
+  }, [columns, formItems, editUrl, remove, rowActions, showActionColumn, readOnly, deleteDisabled, rows, query.page, refresh]);
+
+  if (denied) {
+    return <UnauthorizedPage />;
+  }
 
   return (
     <div className="space-y-4">
@@ -163,7 +206,7 @@ export function CrudListPage<T extends Record<string, any>>({
               <RefreshCw className={loading ? "animate-spin" : undefined} />
             </Button>
             {newRecord ? (
-              <Button id="add-button" onClick={handleAdd} loading={adding}>
+              <Button id="add-button" onClick={handleAdd} loading={adding} disabled={readOnly}>
                 <Plus />
                 {addButtonLabel ?? i18next.t("general:Add")}
               </Button>

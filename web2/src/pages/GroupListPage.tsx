@@ -21,10 +21,20 @@ export default function GroupListPage() {
     dateColumn(),
     dateColumn("updatedTime", i18next.t("general:Updated time")),
     textColumn({dataIndex: "displayName", title: i18next.t("general:Display name"), searchable: true, width: 170}),
-    textColumn({dataIndex: "type", title: i18next.t("general:Type"), width: 110}),
-    textColumn({dataIndex: "parentId", title: i18next.t("group:Parent group"), width: 150}),
+    textColumn({
+      dataIndex: "type",
+      title: i18next.t("general:Type"),
+      width: 110,
+      filters: [
+        {value: "Virtual", label: i18next.t("group:Virtual")},
+        {value: "Physical", label: i18next.t("group:Physical")},
+      ],
+    }),
+    textColumn({dataIndex: "parentId", title: i18next.t("group:Parent group"), width: 150, searchable: true}),
     {
       dataIndex: "users",
+      sortable: true,
+      searchable: true,
       title: i18next.t("general:Users"),
       width: 110,
       align: "center",
@@ -72,6 +82,12 @@ export default function GroupListPage() {
       newRecord={account ? () => newGroup(account) : undefined}
       editUrl={(r) => `/groups/${r.owner}/${r.name}`}
       remove={(r) => GroupBackend.deleteGroup(r)}
+      deleteDisabled={(r) =>
+        r.haveChildren &&
+        i18next.t(
+          "group:You need to delete all subgroups first. You can view the subgroups in the left group tree of the [Organizations] -> [Groups] page",
+        )
+      }
     />
   );
 }

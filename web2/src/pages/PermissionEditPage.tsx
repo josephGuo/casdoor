@@ -12,12 +12,16 @@ import {
   useUserOptions,
 } from "@/hooks/use-options";
 import * as PermissionBackend from "@/backend/PermissionBackend";
+import {
+  enumOptions,
+  PERMISSION_ACTIONS,
+  PERMISSION_API_ACTIONS,
+  PERMISSION_EFFECTS,
+  PERMISSION_RESOURCE_TYPES,
+  PERMISSION_STATES,
+} from "@/lib/enum-labels";
 import * as Setting from "@/lib/setting";
 
-const RESOURCE_TYPES = ["Application", "TreeNode", "Custom"];
-const ACTIONS = ["Read", "Write", "Admin"];
-const EFFECTS = ["Allow", "Deny"];
-const STATES = ["Approved", "Pending", "Rejected"];
 
 export default function PermissionEditPage() {
   const {organizationName = "", permissionName = ""} = useParams();
@@ -51,26 +55,31 @@ export default function PermissionEditPage() {
       type: "select",
       name: "resourceType",
       labelKey: "permission:Resource type",
-      options: () => RESOURCE_TYPES.map((item) => ({value: item, label: item})),
+      options: () => enumOptions(PERMISSION_RESOURCE_TYPES),
     },
     {
       type: "multiselect",
       name: "resources",
       labelKey: "general:Resources",
       creatable: true,
-      options: (ctx) => (ctx.record.resourceType === "Application" ? applications : []),
+      // an API permission is scoped to backend paths; everything else to applications
+      options: (ctx) =>
+        ctx.record.resourceType === "API"
+          ? Setting.getApiPaths().map((path: string) => ({value: path, label: path}))
+          : [{value: "*", label: i18next.t("general:All")}, ...applications],
     },
     {
       type: "multiselect",
       name: "actions",
       labelKey: "permission:Actions",
-      options: () => ACTIONS.map((item) => ({value: item, label: i18next.t(`permission:${item}`)})),
+      options: (ctx) =>
+        enumOptions(ctx.record.resourceType === "API" ? PERMISSION_API_ACTIONS : PERMISSION_ACTIONS),
     },
     {
       type: "select",
       name: "effect",
       labelKey: "permission:Effect",
-      options: () => EFFECTS.map((item) => ({value: item, label: i18next.t(`permission:${item}`)})),
+      options: () => enumOptions(PERMISSION_EFFECTS),
     },
     {type: "switch", name: "isEnabled", labelKey: "general:Is enabled"},
     {type: "text", name: "submitter", labelKey: "permission:Submitter", disabled: () => true},
@@ -81,13 +90,33 @@ export default function PermissionEditPage() {
       type: "select",
       name: "state",
       labelKey: "general:State",
-      options: () => STATES.map((item) => ({value: item, label: i18next.t(`permission:${item}`)})),
+      options: () => enumOptions(PERMISSION_STATES),
       disabled: () => !Setting.isLocalAdminUser(account),
     },
   ];
 
   return (
     <SimpleEditPage
+      beforeSave={(permission) => {
+        // the same checks the antd page runs before it POSTs
+        if ((permission.users?.length ?? 0) === 0 && (permission.roles?.length ?? 0) === 0) {
+          Setting.showMessage("error", i18next.t("general:The users and roles cannot be empty at the same time"));
+          return null;
+        }
+        if ((permission.resources?.length ?? 0) === 0) {
+          Setting.showMessage("error", i18next.t("general:The resources cannot be empty"));
+          return null;
+        }
+        if ((permission.actions?.length ?? 0) === 0) {
+          Setting.showMessage("error", i18next.t("general:The actions cannot be empty"));
+          return null;
+        }
+        if (!Setting.isLocalAdminUser(account) && permission.submitter !== account?.name) {
+          Setting.showMessage("error", i18next.t("general:A normal user can only modify the permission submitted by itself"));
+          return null;
+        }
+        return permission;
+      }}
       titleKey="permission:Edit Permission"
       backTo="/permissions"
       deps={[organizationName, permissionName]}

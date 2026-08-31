@@ -1,6 +1,8 @@
 import * as React from "react";
 import i18next from "i18next";
 import {Link, useNavigate, useParams} from "react-router-dom";
+import {UnauthorizedPage} from "@/components/common/UnauthorizedPage";
+import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert";
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
@@ -32,12 +34,8 @@ import {TransactionTable} from "@/components/user/TransactionTable";
 import {WebauthnCredentialTable} from "@/components/user/WebauthnCredentialTable";
 import {useAccount} from "@/hooks/use-account";
 import {useEditRecord} from "@/hooks/use-edit-record";
-import {
-  useApplicationOptions,
-  useGroupOptions,
-  useOrganizationOptions,
-} from "@/hooks/use-options";
-import {submitEdit} from "@/lib/crud";
+import {dropExtraPhysicalGroups, useApplicationOptions, useGroupList, useGroupOptions, useOrganizationOptions} from "@/hooks/use-options";
+import {getModeTitleKey, submitEdit} from "@/lib/crud";
 import * as ApplicationBackend from "@/backend/ApplicationBackend";
 import * as OrganizationBackend from "@/backend/OrganizationBackend";
 import * as MfaBackend from "@/backend/MfaBackend";
@@ -78,8 +76,9 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
   const organizations = useOrganizationOptions();
   const applications = useApplicationOptions(organizationName);
   const groups = useGroupOptions(organizationName);
+  const groupList = useGroupList(organizationName);
 
-  const {record: user, updateField, updateFields, loading, mode, setMode, reload} = useEditRecord<any>({
+  const {record: user, updateField, updateFields, loading, denied, mode, setMode, reload} = useEditRecord<any>({
     fetch: () => UserBackend.getUser(organizationName, userName),
     deps: [organizationName, userName],
   });
@@ -126,6 +125,10 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
       }
     });
   }, [mode, user?.signupApplication]);
+
+  if (denied) {
+    return <UnauthorizedPage />;
+  }
 
   if (loading || user === null || (self && !account)) {
     return <Loading />;
@@ -212,12 +215,25 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
 
   return (
     <EditPageShell
-      title={`${i18next.t("user:Edit User")} - ${user.displayName || user.name}`}
+      // the antd page calls it "My Account" when you are looking at yourself
+      title={`${i18next.t(
+        mode === "add" ? "user:New User" : isSelf ? "account:My Account" : getModeTitleKey("user:Edit User", mode),
+      )} - ${user.displayName || user.name}`}
       mode={mode}
       backTo={self ? "/" : "/users"}
       onSave={save}
       saving={saving}
     >
+      {isSelf && user.needUpdatePassword ? (
+        <Alert variant="warning" className="mb-4">
+          <AlertTitle>{i18next.t("user:You need to update your password")}</AlertTitle>
+          <AlertDescription>
+            {i18next.t(
+              "user:Your password must be updated before you can continue to use your account, please click the \"Modify password...\" button below",
+            )}
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <AccountItemsProvider
         organization={userOrganization}
         isAdmin={isAdmin}
@@ -335,7 +351,14 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
             <AccountItemRow name="Groups" labelKey="general:Groups">
               <MultiSelect
                 value={user.groups ?? []}
-                onChange={(v) => updateField("groups", v)}
+                onChange={(v) => {
+                  // a user belongs to at most one Physical group
+                  if (dropExtraPhysicalGroups(v, groupList)) {
+                    Setting.showMessage("error", i18next.t("general:You can only select one physical group"));
+                    return;
+                  }
+                  updateField("groups", v);
+                }}
                 options={groups}
               />
             </AccountItemRow>
@@ -674,7 +697,10 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
               <Switch checked={!!user.isVerified} onCheckedChange={(v) => updateField("isVerified", v)} />
             </FormRow>
             <AccountItemRow name="IP whitelist" labelKey="general:IP whitelist">
-              <TagsInput value={user.ipWhitelist ?? []} onChange={(v) => updateField("ipWhitelist", v)} />
+              <Input
+                value={user.ipWhitelist ?? ""}
+                onChange={(e) => updateField("ipWhitelist", e.target.value)}
+              />
             </AccountItemRow>
             <FormRow labelKey="user:Deleted time">
               <Input value={Setting.getFormattedDate(user.deletedTime) ?? ""} disabled />

@@ -5,21 +5,26 @@ import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Switch} from "@/components/ui/switch";
 import {Loading} from "@/components/common/Loading";
+import {MultiSelect} from "@/components/common/MultiSelect";
 import {SelectField} from "@/components/common/SelectField";
 import {TagsInput} from "@/components/common/TagsInput";
 import {EditPageShell} from "@/components/crud/EditPageShell";
 import {EditableTable} from "@/components/crud/EditableTable";
 import {FormRow} from "@/components/crud/FormRow";
+import {dropExtraPhysicalGroups, useGroupList, useGroupOptions} from "@/hooks/use-options";
 import * as LdapBackend from "@/backend/LdapBackend";
+import {getModeTitleKey, mapToRows, rowsToMap} from "@/lib/crud";
+import {enumSelectOptions, LDAP_PASSWORD_TYPES} from "@/lib/enum-labels";
 import * as Setting from "@/lib/setting";
 
-const PASSWORD_TYPES = ["Plain", "SSHA", "MD5"];
 
 /** Create or edit one LDAP server of an organization. */
 export default function LdapEditPage() {
   const {organizationName = "", ldapId = ""} = useParams();
   const navigate = useNavigate();
   const isNew = ldapId === "new";
+  const groups = useGroupOptions(organizationName);
+  const groupList = useGroupList(organizationName);
 
   const [ldap, setLdap] = React.useState<any>(
     isNew
@@ -91,7 +96,7 @@ export default function LdapEditPage() {
 
   return (
     <EditPageShell
-      title={`${i18next.t("ldap:Edit LDAP")} - ${ldap.serverName || organizationName}`}
+      title={`${i18next.t(getModeTitleKey("ldap:Edit LDAP", isNew ? "add" : "edit"))} - ${ldap.serverName || organizationName}`}
       mode={isNew ? "add" : "edit"}
       backTo={`/organizations/${organizationName}`}
       onSave={save}
@@ -150,7 +155,7 @@ export default function LdapEditPage() {
         <SelectField
           value={ldap.passwordType ?? "Plain"}
           onChange={(v) => update("passwordType", v)}
-          options={PASSWORD_TYPES.map((item) => ({id: item, name: item}))}
+          options={enumSelectOptions(LDAP_PASSWORD_TYPES)}
         />
       </FormRow>
       <FormRow labelKey="ldap:Auto Sync">
@@ -165,8 +170,8 @@ export default function LdapEditPage() {
       </FormRow>
       <FormRow labelKey="ldap:Custom attributes" block>
         <EditableTable
-          rows={ldap.customAttributes ?? []}
-          onChange={(rows) => update("customAttributes", rows)}
+          rows={mapToRows(ldap.customAttributes, "attributeName", "userPropertyName")}
+          onChange={(rows) => update("customAttributes", rowsToMap(rows, "attributeName", "userPropertyName"))}
           newRow={() => ({attributeName: "", userPropertyName: ""})}
           reorderable={false}
           columns={[
@@ -192,7 +197,20 @@ export default function LdapEditPage() {
         />
       </FormRow>
       <FormRow labelKey="ldap:Default group">
-        <TagsInput value={ldap.defaultGroups ?? []} onChange={(v) => update("defaultGroups", v)} />
+        <MultiSelect
+          value={ldap.defaultGroups ?? []}
+          onChange={(values) => {
+            // at most one Physical group may be a default; the extras are dropped
+            const trimmed = dropExtraPhysicalGroups(values, groupList);
+            if (trimmed) {
+              Setting.showMessage("warning", i18next.t("ldap:Only one physical group can be selected as default"));
+              update("defaultGroups", trimmed);
+              return;
+            }
+            update("defaultGroups", values);
+          }}
+          options={groups}
+        />
       </FormRow>
     </EditPageShell>
   );

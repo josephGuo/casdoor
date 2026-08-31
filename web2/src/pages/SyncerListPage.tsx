@@ -1,7 +1,7 @@
 import i18next from "i18next";
 import {Button} from "@/components/ui/button";
 import {CrudListPage} from "@/components/crud/CrudListPage";
-import {boolColumn, dateColumn, linkColumn, textColumn} from "@/components/crud/columns";
+import {boolColumn, dateColumn, linkColumn, textColumn, valueFilters} from "@/components/crud/columns";
 import type {ColumnDef} from "@/components/crud/types";
 import {useAccount} from "@/hooks/use-account";
 import {useRequestOrganization} from "@/hooks/use-organization";
@@ -17,20 +17,22 @@ export default function SyncerListPage() {
     linkColumn({dataIndex: "name", to: (r) => `/syncers/${r.organization}/${r.name}`, width: 170}),
     textColumn({dataIndex: "organization", title: i18next.t("general:Organization"), width: 140, searchable: true}),
     dateColumn(),
-    textColumn({dataIndex: "type", title: i18next.t("general:Type"), width: 120}),
+    textColumn({dataIndex: "type", title: i18next.t("general:Type"), width: 120, filters: valueFilters(["Database", "LDAP"])}),
     textColumn({dataIndex: "databaseType", title: i18next.t("syncer:Database type"), width: 140}),
-    textColumn({dataIndex: "host", title: i18next.t("general:Host"), width: 130}),
-    textColumn({dataIndex: "port", title: i18next.t("general:Port"), width: 90}),
-    textColumn({dataIndex: "user", title: i18next.t("general:User"), width: 110}),
+    textColumn({dataIndex: "host", title: i18next.t("general:Host"), width: 130, searchable: true}),
+    textColumn({dataIndex: "port", title: i18next.t("general:Port"), width: 90, searchable: true}),
+    textColumn({dataIndex: "user", title: i18next.t("general:User"), width: 110, searchable: true}),
     {
       dataIndex: "password",
+      sortable: true,
+      searchable: true,
       title: i18next.t("general:Password"),
       width: 110,
       render: (value) => (value ? "••••••" : null),
     },
     textColumn({dataIndex: "database", title: i18next.t("syncer:Database"), width: 130}),
     textColumn({dataIndex: "table", title: i18next.t("syncer:Table"), width: 130}),
-    textColumn({dataIndex: "syncInterval", title: i18next.t("syncer:Sync interval"), width: 130}),
+    textColumn({dataIndex: "syncInterval", title: i18next.t("syncer:Sync interval"), width: 130, searchable: true}),
     boolColumn({dataIndex: "isEnabled", title: i18next.t("general:Is enabled")}),
   ];
 

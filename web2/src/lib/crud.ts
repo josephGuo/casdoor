@@ -1,7 +1,24 @@
 import i18next from "i18next";
 import * as Setting from "@/lib/setting";
 
-export type EditMode = "add" | "edit";
+/** "view" is the read-only page a non-admin gets, as in the antd frontend. */
+export type EditMode = "add" | "edit" | "view";
+
+/**
+ * The antd pages title themselves "New X" / "View X" / "Edit X" depending on the
+ * mode, and the three keys always differ by that one word — so the "Edit X" key
+ * a page declares is enough to reach the other two. A locale missing "New X"
+ * falls back to the key text, which is what the antd frontend shows too.
+ */
+export function getModeTitleKey(editTitleKey: string, mode: EditMode): string {
+  if (mode === "add") {
+    return editTitleKey.replace(":Edit ", ":New ");
+  }
+  if (mode === "view") {
+    return editTitleKey.replace(":Edit ", ":View ");
+  }
+  return editTitleKey;
+}
 
 export interface CasdoorResponse<T = any> {
   status: "ok" | "error";
@@ -83,4 +100,36 @@ export async function submitAdd<T>(options: {
     Setting.showMessage("error", `${i18next.t("general:Failed to connect to server")}: ${error}`);
     return false;
   }
+}
+
+/**
+ * Several Casdoor columns are `map[string]string` on the wire but are edited as
+ * a two-column table (LDAP custom attributes, provider HTTP headers, user
+ * properties). These convert between the two; the antd frontend did the same
+ * inside `AttributesMapperTable` / `HttpHeaderTable`.
+ *
+ * Feeding the map straight to `EditableTable` would crash the page on `.map`,
+ * and saving the rows back would replace the object with an array.
+ */
+export function mapToRows(
+  map: Record<string, string> | null | undefined,
+  keyName: string,
+  valueName: string,
+): Record<string, string>[] {
+  if (!map || typeof map !== "object" || Array.isArray(map)) {
+    return [];
+  }
+  return Object.entries(map).map(([key, value]) => ({[keyName]: key, [valueName]: `${value ?? ""}`}));
+}
+
+export function rowsToMap(
+  rows: Record<string, any>[] | null | undefined,
+  keyName: string,
+  valueName: string,
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  (rows ?? []).forEach((row) => {
+    map[row?.[keyName] ?? ""] = row?.[valueName] ?? "";
+  });
+  return map;
 }

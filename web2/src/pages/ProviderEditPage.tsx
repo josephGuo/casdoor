@@ -1,6 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
 import {useNavigate, useParams} from "react-router-dom";
+import {UnauthorizedPage} from "@/components/common/UnauthorizedPage";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Switch} from "@/components/ui/switch";
@@ -21,7 +22,7 @@ import * as CertBackend from "@/backend/CertBackend";
 import * as OrganizationBackend from "@/backend/OrganizationBackend";
 import * as ProviderBackend from "@/backend/ProviderBackend";
 import * as ServerBackend from "@/backend/ServerBackend";
-import {submitEdit} from "@/lib/crud";
+import {mapToRows, rowsToMap, submitEdit} from "@/lib/crud";
 import * as ProviderTest from "@/lib/provider-test";
 import * as Setting from "@/lib/setting";
 import {authConfig} from "@/auth/Auth";
@@ -408,7 +409,7 @@ export default function ProviderEditPage() {
     return provider;
   }, []);
 
-  const {record: provider, setRecord, loading, mode, setMode} = useEditRecord<any>({
+  const {record: provider, setRecord, loading, denied, mode, setMode} = useEditRecord<any>({
     fetch: () => ProviderBackend.getProvider(organizationName, providerName),
     transform,
     deps: [organizationName, providerName],
@@ -640,6 +641,10 @@ export default function ProviderEditPage() {
       });
   };
 
+  if (denied) {
+    return <UnauthorizedPage />;
+  }
+
   if (loading || provider === null) {
     return <Loading />;
   }
@@ -797,8 +802,8 @@ export default function ProviderEditPage() {
 
   const renderHttpHeaderTable = () => (
     <EditableTable
-      rows={provider.httpHeaders}
-      onChange={(rows) => updateProviderField("httpHeaders", rows)}
+      rows={mapToRows(provider.httpHeaders, "name", "value")}
+      onChange={(rows) => updateProviderField("httpHeaders", rowsToMap(rows, "name", "value"))}
       newRow={() => ({name: "", value: ""})}
       reorderable={false}
       columns={[

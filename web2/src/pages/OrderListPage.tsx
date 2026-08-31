@@ -18,6 +18,8 @@ const stateVariant = (state: string) =>
 export default function OrderListPage() {
   const {account} = useAccount();
   const organizationName = useRequestOrganization();
+  // the antd list pages let a non-admin look but not touch these
+  const readOnly = !Setting.isLocalAdminUser(account);
 
   const columns: ColumnDef<any>[] = [
     linkColumn({dataIndex: "name", to: (r) => `/orders/${r.owner}/${r.name}`, width: 180}),
@@ -46,6 +48,7 @@ export default function OrderListPage() {
     },
     {
       dataIndex: "state",
+      searchable: true,
       title: i18next.t("general:State"),
       width: 110,
       sortable: true,
@@ -62,15 +65,19 @@ export default function OrderListPage() {
         OrderBackend.getOrders(organizationName, q.page, q.pageSize, q.searchedColumn, q.searchText, q.sortField, q.sortOrder)
       }
       newRecord={account ? () => newOrder(account) : undefined}
+      readOnly={readOnly}
       editUrl={(r) => `/orders/${r.owner}/${r.name}`}
       remove={(r) => OrderBackend.deleteOrder(r)}
       rowActions={(record, _index, {refresh}) => (
         <>
-          {record.state === "Created" ? (
-            <Button variant="ghost" size="sm" asChild>
-              <Link to={`/orders/${record.owner}/${record.name}/pay`}>{i18next.t("order:Pay")}</Link>
-            </Button>
-          ) : null}
+          {/* the same page pays an unpaid order and shows a paid one */}
+          <Button variant="ghost" size="sm" asChild>
+            <Link to={`/orders/${record.owner}/${record.name}/pay`}>
+              {record.state === "Created" || record.state === "Failed"
+                ? i18next.t("order:Pay")
+                : i18next.t("general:Detail")}
+            </Link>
+          </Button>
           {/* only an admin may cancel, and only an order nobody has paid for yet */}
           {record.state === "Created" && Setting.isLocalAdminUser(account) ? (
             <ConfirmButton
