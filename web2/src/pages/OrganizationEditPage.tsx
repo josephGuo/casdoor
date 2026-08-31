@@ -8,6 +8,7 @@ import {Switch} from "@/components/ui/switch";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Loading} from "@/components/common/Loading";
 import {MultiSelect} from "@/components/common/MultiSelect";
+import {NavItemTree, WidgetItemTree} from "@/components/common/NavItemTree";
 import {SearchableSelect} from "@/components/common/SearchableSelect";
 import {SelectField} from "@/components/common/SelectField";
 import {TagsInput} from "@/components/common/TagsInput";
@@ -15,12 +16,13 @@ import {ThemeEditor} from "@/components/common/ThemeEditor";
 import {EditPageShell} from "@/components/crud/EditPageShell";
 import {EditableTable} from "@/components/crud/EditableTable";
 import {FormRow} from "@/components/crud/FormRow";
+import {useAccount} from "@/hooks/use-account";
 import {useEditRecord} from "@/hooks/use-edit-record";
 import {submitEdit} from "@/lib/crud";
 import * as ApplicationBackend from "@/backend/ApplicationBackend";
 import * as LdapBackend from "@/backend/LdapBackend";
+import {ConfirmButton} from "@/components/common/ConfirmButton";
 import * as OrganizationBackend from "@/backend/OrganizationBackend";
-import {NavItemKeys, WidgetItemKeys} from "@/lib/nav-items";
 import * as Setting from "@/lib/setting";
 
 const PASSWORD_TYPES = ["plain", "salt", "sha512-salt", "md5-salt", "bcrypt", "pbkdf2-salt", "argon2id", "pbkdf2-django"];
@@ -48,6 +50,7 @@ function passwordOptions() {
 export default function OrganizationEditPage() {
   const {organizationName = ""} = useParams();
   const navigate = useNavigate();
+  const {account} = useAccount();
   const [saving, setSaving] = React.useState(false);
   const [applications, setApplications] = React.useState<any[]>([]);
   const [ldaps, setLdaps] = React.useState<any[] | null>(null);
@@ -76,6 +79,18 @@ export default function OrganizationEditPage() {
     }
     loadRelated();
   }, [mode, loadRelated]);
+
+  const deleteLdap = (ldap: any) =>
+    LdapBackend.deleteLdap(ldap)
+      .then((res: any) => {
+        if (res.status === "ok") {
+          Setting.showMessage("success", i18next.t("general:Successfully deleted"));
+          setLdaps((prev) => (prev ?? []).filter((item) => item.id !== ldap.id));
+        } else {
+          Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${res.msg}`);
+        }
+      })
+      .catch((error) => Setting.showMessage("error", `${i18next.t("general:Failed to delete")}: ${error}`));
 
   if (loading || organization === null) {
     return <Loading />;
@@ -135,7 +150,7 @@ export default function OrganizationEditPage() {
     >
       <Tabs defaultValue="basic">
         <TabsList className="mb-2 flex-wrap">
-          <TabsTrigger value="basic">{i18next.t("general:Basic info")}</TabsTrigger>
+          <TabsTrigger value="basic">{i18next.t("application:Basic")}</TabsTrigger>
           <TabsTrigger value="password">{i18next.t("general:Password type")}</TabsTrigger>
           <TabsTrigger value="account">{i18next.t("organization:Account items")}</TabsTrigger>
           <TabsTrigger value="advanced">{i18next.t("provider:Advanced")}</TabsTrigger>
@@ -429,7 +444,7 @@ export default function OrganizationEditPage() {
           <FormRow labelKey="organization:Is profile public">
             <Switch checked={!!organization.isProfilePublic} onCheckedChange={(v) => update("isProfilePublic", v)} />
           </FormRow>
-          <FormRow labelKey="organization:Use email as username">
+          <FormRow labelKey="organization:Use Email as username">
             <Switch
               checked={!!organization.useEmailAsUsername}
               onCheckedChange={(v) => update("useEmailAsUsername", v)}
@@ -516,25 +531,25 @@ export default function OrganizationEditPage() {
               options={Setting.getUserCommonFields().map((item: string) => ({value: item, label: item}))}
             />
           </FormRow>
-          <FormRow labelKey="organization:Admin navbar items">
-            <MultiSelect
-              value={organization.navItems ?? ["all"]}
-              onChange={(value) => update("navItems", value)}
-              options={NavItemKeys.map((item) => ({value: item, label: item}))}
+          <FormRow labelKey="organization:Admin navbar items" block>
+            <NavItemTree
+              disabled={!Setting.isAdminUser(account)}
+              checkedKeys={organization.navItems ?? ["all"]}
+              onCheck={(value) => update("navItems", value)}
             />
           </FormRow>
-          <FormRow labelKey="organization:User navbar items">
-            <MultiSelect
-              value={organization.userNavItems ?? ["all"]}
-              onChange={(value) => update("userNavItems", value)}
-              options={NavItemKeys.map((item) => ({value: item, label: item}))}
+          <FormRow labelKey="organization:User navbar items" block>
+            <NavItemTree
+              disabled={!Setting.isAdminUser(account)}
+              checkedKeys={organization.userNavItems ?? []}
+              onCheck={(value) => update("userNavItems", value)}
             />
           </FormRow>
-          <FormRow labelKey="organization:Widget items">
-            <MultiSelect
-              value={organization.widgetItems ?? ["all"]}
-              onChange={(value) => update("widgetItems", value)}
-              options={WidgetItemKeys.map((item) => ({value: item, label: item}))}
+          <FormRow labelKey="organization:Widget items" block>
+            <WidgetItemTree
+              disabled={!Setting.isAdminUser(account)}
+              checkedKeys={organization.widgetItems ?? ["all"]}
+              onCheck={(value) => update("widgetItems", value)}
             />
           </FormRow>
           <FormRow labelKey="organization:Kerberos realm">
@@ -573,13 +588,15 @@ export default function OrganizationEditPage() {
                       <th className="px-3 py-2 text-left">{i18next.t("ldap:Server name")}</th>
                       <th className="px-3 py-2 text-left">{i18next.t("ldap:Server")}</th>
                       <th className="px-3 py-2 text-left">{i18next.t("ldap:Base DN")}</th>
+                      <th className="px-3 py-2 text-left">{i18next.t("ldap:Auto Sync")}</th>
+                      <th className="px-3 py-2 text-left">{i18next.t("ldap:Last Sync")}</th>
                       <th className="px-3 py-2 text-left">{i18next.t("general:Action")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(ldaps ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">
+                        <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
                           {i18next.t("general:No data")}
                         </td>
                       </tr>
@@ -599,9 +616,30 @@ export default function OrganizationEditPage() {
                           </td>
                           <td className="px-3 py-2">{ldap.baseDn}</td>
                           <td className="px-3 py-2">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link to={`/ldap/sync/${organization.name}/${ldap.id}`}>{i18next.t("general:Sync")}</Link>
-                            </Button>
+                            {ldap.autoSync === 0 ? (
+                              <span className="text-warning">{i18next.t("general:Disable")}</span>
+                            ) : (
+                              <span className="text-success">{ldap.autoSync} mins</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">{ldap.lastSync}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-1">
+                              <Button variant="outline" size="sm" asChild>
+                                <Link to={`/ldap/sync/${organization.name}/${ldap.id}`}>{i18next.t("general:Sync")}</Link>
+                              </Button>
+                              <Button variant="outline" size="sm" asChild>
+                                <Link to={`/ldap/${organization.name}/${ldap.id}`}>{i18next.t("general:Edit")}</Link>
+                              </Button>
+                              <ConfirmButton
+                                variant="destructive"
+                                size="sm"
+                                description={`${ldap.serverName ?? ""}`}
+                                onConfirm={() => deleteLdap(ldap)}
+                              >
+                                {i18next.t("general:Delete")}
+                              </ConfirmButton>
+                            </div>
                           </td>
                         </tr>
                       ))

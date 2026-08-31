@@ -17,6 +17,7 @@ import {getCaptchaProvider} from "@/lib/captcha";
 import {authConfig} from "@/auth/Auth";
 import * as Util from "@/auth/Util";
 import * as ApplicationBackend from "@/backend/ApplicationBackend";
+import * as InvitationBackend from "@/backend/InvitationBackend";
 import * as AuthBackend from "@/backend/AuthBackend";
 import * as Setting from "@/lib/setting";
 
@@ -58,12 +59,27 @@ export default function SignupPage() {
       .then((res: any) => {
         if (res.status === "ok") {
           setApplication(res.data);
+          const invitationCode = searchParams.get("invitationCode") ?? "";
           setValues((prev) => ({
             ...prev,
             application: res.data.name,
             organization: res.data.organization,
-            invitationCode: searchParams.get("invitationCode") ?? "",
+            invitationCode,
           }));
+          // an invitation can pin the email or phone the account must be created with
+          if (invitationCode !== "") {
+            InvitationBackend.getInvitationCodeInfo(invitationCode, `admin/${res.data.name}`).then((infoRes: any) => {
+              if (infoRes.status === "error") {
+                Setting.showMessage("error", infoRes.msg);
+                return;
+              }
+              setValues((prev) => ({
+                ...prev,
+                ...(infoRes.data?.email ? {email: infoRes.data.email} : {}),
+                ...(infoRes.data?.phone ? {phone: infoRes.data.phone} : {}),
+              }));
+            });
+          }
         } else {
           setApplication(null);
           setMsg(res.msg);
@@ -217,7 +233,7 @@ export default function SignupPage() {
     case "Confirm password":
       return (
         <div key={item.name} className="space-y-2">
-          <Label htmlFor="confirm">{i18next.t("signup:Confirm")}</Label>
+          <Label htmlFor="confirm">{i18next.t("general:Confirm")}</Label>
           <Input
             id="confirm"
             type="password"

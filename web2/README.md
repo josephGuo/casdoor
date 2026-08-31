@@ -43,7 +43,7 @@ instead, either point that path at `web2/build` or copy `web2/build` over
 | `src/backend/*.js` | `src/backend/*.ts` — same functions, same endpoints, `any`-typed params |
 | `src/Setting.js` | `src/lib/setting.tsx` — the pure logic is ported verbatim; antd renderers replaced |
 | `src/auth/Util.js`, `Provider.js`, `Obfuscator.js` | `src/auth/*.ts` — ported verbatim (PKCE, OAuth/CAS/SAML query handling) |
-| `src/locales/**` | copied unchanged — same keys, same 11 bundled languages |
+| `src/locales/**` | copied from `web`, same 11 bundled languages, plus 9 strings for rows `web` does not render |
 | `BaseListPage` | `components/crud/CrudListPage` + `hooks/use-table-data` |
 | antd `<Table>` | `components/crud/DataTable` (server-side paging, per-column search, sort) |
 | `<Row><Col>` label rows | `components/crud/FormRow` |
@@ -85,28 +85,47 @@ records, tokens, verifications, products, coupons, orders, payments, plans,
 pricings, subscriptions, transactions, forms, syncers, webhooks, webhook events,
 tickets, LDAP (edit + sync).
 
-## Not ported yet
+**Organization branding** — the sign-in pages apply the organization/application
+`themeData` to the shadcn CSS variables, set the tab title and favicon, inject
+`headerHtml` / `pageHtml` into `<head>`, and block the whole surface when an
+`ipRestriction` is set. Before `get-application` returns, the `organizationTheme`
+/ `organizationLogo` / `organizationFootHtml` cookies that
+`routers/theme_filter.go` sets stand in, so the first paint is already branded.
 
-These exist in `../web` and still need work here:
+**Organization menus** — `navItems` / `userNavItems` hide navbar entries (and
+collapse the sidebar into a flat list once few enough are left), and
+`widgetItems` hides the header's theme, language, AI assistant and tour buttons.
 
-- **Login extras**: WebAuthn, Face ID, Web3/MetaMask, WeChat QR panel, Telegram
-  widget, device-login panel.
-- **Storefront & checkout**: product store, server (MCP) store, cart, product
-  buy, order pay, payment result, `/select-plan` and `/buy-plan` pricing pages,
-  `/qrcode`.
-- **Editors/viewers**: form editor (`/forms/:name`), Casbin policy editor on the
-  adapter page, enforcer tester, OpenClaw session graph & transcript viewers,
-  SELinux entry viewer.
-- **Edit-page extras**: application import/export, resource upload, and the
-  IP/WAF/UA rule sub-tables of the rule pages. Every other field of every ported
-  edit page is present (509/509), and the list pages carry every column the antd
-  ones did — the navbar/widget item trees are multi-selects rather than trees,
-  and the theme editor is a colour/radius/compact form rather than
-  antd-token-previewer.
-- **Chrome**: the product tour, the AI assistant drawer, and the GitHub corner.
+**Bulk import** — "Download template" and "Upload (.xlsx)" on the user, group,
+role and permission list pages, posting to `upload-users` / `upload-groups` /
+`upload-roles` / `upload-permissions`.
 
-Everything above degrades to a normal 404 inside the console rather than
-breaking another page.
+**Theme** — the organization/application `themeData` editor covers the same four
+values the antd one did (theme preset, primary colour, border radius, compact),
+rendered as shadcn controls rather than antd-token-previewer. `themeType: "dark"`
+forces the dark palette on the branded surfaces and `isCompact` tightens the root
+rem size, which is this frontend's equivalent of antd's dark/compact algorithms.
+The navbar and widget item pickers are checkable trees (`CheckboxTree`) with
+antd's check semantics, so the stored `navItems` / `userNavItems` / `widgetItems`
+are byte-compatible with the antd frontend.
+
+## Deliberately not ported
+
+- **Entry viewers**: the rich entry message viewer, the SELinux entry viewer, and
+  the OpenClaw session graph and transcript pages. The entry edit page shows the
+  raw message instead, and the entry list no longer offers a "Transcript" action.
+- **Web3**: `auth/Web3Auth.ts` talks to `window.ethereum` directly rather than
+  going through `@web3-onboard`, so the extra wallets that library bundles
+  (Coinbase, Phantom, Trust, Gnosis, ...) are not offered. MetaMask works.
+
+## Still to do
+
+- **Deployment**: the Go backend still serves `web/build`
+  (`routers/static_filter.go` returns it before it ever looks at
+  `frontendBaseDir`), `public/` has none of the standalone scripts
+  `routers/lightweight_auth_filter.go` serves, `index.html` is missing the
+  boot-failure fallback, and the Dockerfile / Makefile / CI still build `../web`.
+  There are no Cypress e2e tests here either.
 
 ## Adding a page
 

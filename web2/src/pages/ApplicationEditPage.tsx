@@ -1,5 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
+import copy from "copy-to-clipboard";
+import {Copy, Link as LinkIcon} from "lucide-react";
 import {useNavigate, useParams} from "react-router-dom";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -112,9 +114,45 @@ export default function ApplicationEditPage() {
     deps: [applicationName],
   });
 
+  const [samlMetadata, setSamlMetadata] = React.useState("");
+  const enableSamlPostBinding = !!application?.enableSamlPostBinding;
+
+  React.useEffect(() => {
+    // the metadata is generated from the saved application, so it needs it to exist
+    if (mode === "add" || !applicationName) {
+      return;
+    }
+    ApplicationBackend.getSamlMetadata("admin", applicationName, enableSamlPostBinding).then((data: any) => {
+      setSamlMetadata(data?.toString() ?? "");
+    });
+  }, [mode, applicationName, enableSamlPostBinding]);
+
   if (loading || application === null) {
     return <Loading />;
   }
+
+  const copyToClipboard = (text: string) => {
+    copy(text);
+    Setting.showMessage("success", i18next.t("general:Copied to clipboard successfully"));
+  };
+
+  const idpInitiatedSsoUrl =
+    `${window.location.origin}/login/saml/authorize/${application.owner}/${encodeURIComponent(applicationName)}`;
+  const samlMetadataUrl =
+    `${window.location.origin}/api/saml/metadata?application=admin/${encodeURIComponent(applicationName)}` +
+    `&enablePostBinding=${enableSamlPostBinding}`;
+
+  // the sign-in link antd shows next to its login preview
+  const redirectUri = application.redirectUris?.length > 0
+    ? application.redirectUris[0]
+    : "\"ERROR: You must specify at least one Redirect URL in 'Redirect URLs'\"";
+  const clientId = application.isShared ? `${application.clientId}-org-${account?.owner}` : application.clientId;
+  const signInUrl =
+    `/login/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=read&state=casdoor`;
+  const signUpUrl = Setting.isPasswordEnabled(application)
+    ? `/signup/${application.name}`
+    : signInUrl.replace("/login/oauth/authorize", "/signup/oauth/authorize");
+  const promptUrl = `/prompt/${application.name}`;
 
   const save = async(exitAfterSave: boolean) => {
     setSaving(true);
@@ -161,7 +199,7 @@ export default function ApplicationEditPage() {
     >
       <Tabs defaultValue="basic">
         <TabsList className="mb-2 flex-wrap">
-          <TabsTrigger value="basic">{i18next.t("general:Basic info")}</TabsTrigger>
+          <TabsTrigger value="basic">{i18next.t("application:Basic")}</TabsTrigger>
           <TabsTrigger value="signin">{i18next.t("application:Signin methods")}</TabsTrigger>
           <TabsTrigger value="signup">{i18next.t("application:Signup items")}</TabsTrigger>
           <TabsTrigger value="providers">{i18next.t("application:Providers")}</TabsTrigger>
@@ -171,6 +209,28 @@ export default function ApplicationEditPage() {
         </TabsList>
 
         <TabsContent value="basic">
+          {/* antd puts these next to its live sign-in previews; this frontend has no
+              previews, so the links live on their own row at the top of the tab */}
+          {mode === "add" ? null : (
+            <FormRow labelKey="general:Login page" block>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => copyToClipboard(`${window.location.origin}${signInUrl}`)}>
+                  <Copy />
+                  {i18next.t("application:Copy signin page URL")}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => copyToClipboard(`${window.location.origin}${signUpUrl}`)}>
+                  <Copy />
+                  {i18next.t("application:Copy signup page URL")}
+                </Button>
+                {Setting.hasPromptPage(application) ? (
+                  <Button variant="outline" size="sm" onClick={() => copyToClipboard(`${window.location.origin}${promptUrl}`)}>
+                    <Copy />
+                    {i18next.t("application:Copy prompt page URL")}
+                  </Button>
+                ) : null}
+              </div>
+            </FormRow>
+          )}
           <FormRow labelKey="general:Organization">
             <SearchableSelect
               value={application.organization}
@@ -210,16 +270,28 @@ export default function ApplicationEditPage() {
               ) : null}
             </div>
           </FormRow>
+          <FormRow labelKey="general:Title">
+            <Input value={application.title ?? ""} onChange={(e) => updateField("title", e.target.value)} />
+          </FormRow>
           <FormRow labelKey="general:Favicon">
             <Input value={application.favicon ?? ""} onChange={(e) => updateField("favicon", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="application:Home">
+          <FormRow labelKey="general:Home">
             <Input value={application.homepageUrl ?? ""} onChange={(e) => updateField("homepageUrl", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="general:Tags">
+          <FormRow labelKey="organization:Tags">
             <TagsInput value={application.tags ?? []} onChange={(v) => updateField("tags", v)} />
           </FormRow>
-          <FormRow labelKey="application:Is shared">
+          <FormRow labelKey="application:Order">
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              value={application.order ?? 0}
+              onChange={(e) => updateField("order", Setting.myParseInt(e.target.value))}
+            />
+          </FormRow>
+          <FormRow labelKey="general:Is shared">
             <Switch checked={!!application.isShared} onCheckedChange={(v) => updateField("isShared", v)} />
           </FormRow>
           <FormRow labelKey="application:Disable signin">
@@ -331,19 +403,13 @@ export default function ApplicationEditPage() {
               ]}
             />
           </FormRow>
-          <FormRow labelKey="application:Enable code signin">
-            <Switch
-              checked={!!application.enableCodeSignin}
-              onCheckedChange={(v) => updateField("enableCodeSignin", v)}
-            />
-          </FormRow>
-          <FormRow labelKey="application:Enable signin session">
+          <FormRow labelKey="application:Signin session">
             <Switch
               checked={!!application.enableSigninSession}
               onCheckedChange={(v) => updateField("enableSigninSession", v)}
             />
           </FormRow>
-          <FormRow labelKey="application:Enable auto signin">
+          <FormRow labelKey="application:Auto signin">
             <Switch
               checked={!!application.enableAutoSignin}
               onCheckedChange={(v) => updateField("enableAutoSignin", v)}
@@ -363,16 +429,16 @@ export default function ApplicationEditPage() {
               onChange={(e) => updateField("failedSigninFrozenTime", Setting.myParseInt(e.target.value))}
             />
           </FormRow>
-          <FormRow labelKey="application:Signin URL">
+          <FormRow labelKey="general:Signin URL">
             <Input value={application.signinUrl ?? ""} onChange={(e) => updateField("signinUrl", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="application:Signup URL">
+          <FormRow labelKey="general:Signup URL">
             <Input value={application.signupUrl ?? ""} onChange={(e) => updateField("signupUrl", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="application:Forget URL">
+          <FormRow labelKey="general:Forget URL">
             <Input value={application.forgetUrl ?? ""} onChange={(e) => updateField("forgetUrl", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="application:Affiliation URL">
+          <FormRow labelKey="general:Affiliation URL">
             <Input
               value={application.affiliationUrl ?? ""}
               onChange={(e) => updateField("affiliationUrl", e.target.value)}
@@ -541,16 +607,16 @@ export default function ApplicationEditPage() {
               ]}
             />
           </FormRow>
-          <FormRow labelKey="application:Terms of Use">
+          <FormRow labelKey="signup:Terms of Use">
             <Input value={application.termsOfUse ?? ""} onChange={(e) => updateField("termsOfUse", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="application:Default group">
+          <FormRow labelKey="ldap:Default group">
             <Input value={application.defaultGroup ?? ""} onChange={(e) => updateField("defaultGroup", e.target.value)} />
           </FormRow>
           <FormRow labelKey="application:Default tag">
             <Input value={application.defaultTag ?? ""} onChange={(e) => updateField("defaultTag", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="application:Enable link with email">
+          <FormRow labelKey="application:Enable Email linking">
             <Switch
               checked={!!application.enableLinkWithEmail}
               onCheckedChange={(v) => updateField("enableLinkWithEmail", v)}
@@ -623,11 +689,15 @@ export default function ApplicationEditPage() {
         </TabsContent>
 
         <TabsContent value="oauth">
-          <FormRow labelKey="application:Client ID">
-            <Input value={application.clientId ?? ""} disabled />
+          {/* both are editable so that an admin can rotate the pair, as in the antd page */}
+          <FormRow labelKey="provider:Client ID">
+            <Input value={application.clientId ?? ""} onChange={(e) => updateField("clientId", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="application:Client secret">
-            <Input value={application.clientSecret ?? ""} disabled />
+          <FormRow labelKey="provider:Client secret">
+            <Input
+              value={application.clientSecret ?? ""}
+              onChange={(e) => updateField("clientSecret", e.target.value)}
+            />
           </FormRow>
           <FormRow labelKey="application:Redirect URLs">
             <TagsInput value={application.redirectUris ?? []} onChange={(v) => updateField("redirectUris", v)} />
@@ -689,7 +759,7 @@ export default function ApplicationEditPage() {
               onChange={(e) => updateField("cookieExpireInHours", Setting.myParseInt(e.target.value))}
             />
           </FormRow>
-          <FormRow labelKey="application:Scopes">
+          <FormRow labelKey="general:Scopes">
             <TagsInput value={application.scopes ?? []} onChange={(v) => updateField("scopes", v)} />
           </FormRow>
           <FormRow labelKey="application:Client cert">
@@ -705,7 +775,7 @@ export default function ApplicationEditPage() {
               onChange={(e) => updateField("forcedRedirectOrigin", e.target.value)}
             />
           </FormRow>
-          <FormRow labelKey="application:Backchannel logout URI">
+          <FormRow labelKey="application:Backchannel logout URL">
             <Input
               value={application.backchannelLogoutUri ?? ""}
               onChange={(e) => updateField("backchannelLogoutUri", e.target.value)}
@@ -795,7 +865,7 @@ export default function ApplicationEditPage() {
           <FormRow labelKey="application:SAML reply URL">
             <Input value={application.samlReplyUrl ?? ""} onChange={(e) => updateField("samlReplyUrl", e.target.value)} />
           </FormRow>
-          <FormRow labelKey="application:Enable SAML compress">
+          <FormRow labelKey="application:Enable SAML compression">
             <Switch
               checked={!!application.enableSamlCompress}
               onCheckedChange={(v) => updateField("enableSamlCompress", v)}
@@ -847,7 +917,7 @@ export default function ApplicationEditPage() {
               onCheckedChange={(v) => updateField("disableSamlAttributes", v)}
             />
           </FormRow>
-          <FormRow labelKey="application:SAML attributes" block>
+          <FormRow labelKey="general:SAML attributes" block>
             <EditableTable
               rows={application.samlAttributes ?? []}
               onChange={(rows) => updateField("samlAttributes", rows)}
@@ -880,17 +950,43 @@ export default function ApplicationEditPage() {
               ]}
             />
           </FormRow>
+          {/* both are generated from the saved application, so only after it exists */}
+          {mode === "add" ? null : (
+            <>
+              <FormRow labelKey="application:SAML metadata" block>
+                <div className="space-y-2">
+                  <CodeEditor language="xml" value={samlMetadata} readOnly onChange={() => undefined} />
+                  <Button variant="outline" size="sm" onClick={() => copyToClipboard(samlMetadataUrl)}>
+                    <Copy />
+                    {i18next.t("application:Copy SAML metadata URL")}
+                  </Button>
+                </div>
+              </FormRow>
+              <FormRow labelKey="application:IdP-initiated SSO URL" block>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <Input value={idpInitiatedSsoUrl} readOnly />
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => copyToClipboard(idpInitiatedSsoUrl)}>
+                    <Copy />
+                    {i18next.t("application:Copy IdP-initiated SSO URL")}
+                  </Button>
+                </div>
+              </FormRow>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="appearance">
-          <FormRow labelKey="application:Form CSS" block>
+          <FormRow labelKey="application:Custom CSS" block>
             <CodeEditor
               language="css"
               value={application.formCss ?? ""}
               onChange={(v) => updateField("formCss", v)}
             />
           </FormRow>
-          <FormRow labelKey="application:Form CSS Mobile" block>
+          <FormRow labelKey="application:Custom CSS Mobile" block>
             <CodeEditor
               language="css"
               value={application.formCssMobile ?? ""}

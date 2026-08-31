@@ -22,6 +22,8 @@ export default function KeyEditPage() {
       labelKey: "general:Organization",
       options: () => organizations,
       disabled: () => !Setting.isAdminUser(account),
+      // the key stores the organization twice, and the backend reads `organization`
+      onChange: (value, _ctx, updateFields) => updateFields({owner: value, organization: value}),
     },
     {type: "text", name: "name", labelKey: "general:Name"},
     {type: "text", name: "displayName", labelKey: "general:Display name"},
@@ -46,7 +48,7 @@ export default function KeyEditPage() {
       options: () => users,
     },
     {type: "text", name: "accessKey", labelKey: "general:Access key", disabled: () => true},
-    {type: "text", name: "accessSecret", labelKey: "general:Access secret", disabled: () => true},
+    {type: "text", name: "accessSecret", labelKey: "cert:Access secret", disabled: () => true},
     {type: "text", name: "expireTime", labelKey: "general:Expire time"},
     {
       type: "select",

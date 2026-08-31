@@ -2,6 +2,7 @@ import i18next from "i18next";
 import {Link} from "react-router-dom";
 import {Badge} from "@/components/ui/badge";
 import {CrudListPage} from "@/components/crud/CrudListPage";
+import {XlsxImport} from "@/components/crud/XlsxImport";
 import {boolColumn, dateColumn, linkColumn, organizationColumn, refsColumn, tagsColumn, textColumn} from "@/components/crud/columns";
 import type {ColumnDef} from "@/components/crud/types";
 import {useAccount} from "@/hooks/use-account";
@@ -16,6 +17,9 @@ const stateVariant = (state: string) =>
 export default function PermissionListPage() {
   const {account} = useAccount();
   const organizationName = useRequestOrganization();
+  // a normal user may only list the permissions they submitted themselves
+  const isAdmin = Setting.isLocalAdminUser(account);
+  const isGlobal = account ? Setting.isDefaultOrganizationSelected(account) : false;
 
   const columns: ColumnDef<any>[] = [
     linkColumn({dataIndex: "name", to: (r) => `/permissions/${r.owner}/${r.name}`}),
@@ -65,10 +69,19 @@ export default function PermissionListPage() {
     <CrudListPage
       title={i18next.t("general:Permissions")}
       columns={columns}
-      deps={[organizationName]}
+      toolbar={({refresh}) => (
+        <XlsxImport
+          columns={Setting.getPermissionColumns()}
+          templateName="import-permission.xlsx"
+          uploadApi="upload-permissions"
+          successMessage="Permissions uploaded successfully, refreshing the page"
+          onUploaded={refresh}
+        />
+      )}
+      deps={[organizationName, isAdmin, isGlobal]}
       fetch={(q) =>
-        PermissionBackend.getPermissions(
-          organizationName,
+        (isAdmin ? PermissionBackend.getPermissions : PermissionBackend.getPermissionsBySubmitter)(
+          isGlobal ? "" : organizationName,
           q.page,
           q.pageSize,
           q.searchedColumn,
