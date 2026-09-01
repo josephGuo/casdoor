@@ -1,6 +1,6 @@
 import i18next from "i18next";
 import {CrudListPage} from "@/components/crud/CrudListPage";
-import {boolColumn, dateColumn, linkColumn, tagsColumn, textColumn, valueFilters} from "@/components/crud/columns";
+import {boolColumn, dateColumn, linkColumn, tagsColumn, textColumn, urlColumn, valueFilters} from "@/components/crud/columns";
 import type {ColumnDef} from "@/components/crud/types";
 import {useAccount} from "@/hooks/use-account";
 import {useRequestOrganization} from "@/hooks/use-organization";
@@ -13,9 +13,9 @@ export default function WebhookListPage() {
 
   const columns: ColumnDef<any>[] = [
     linkColumn({dataIndex: "name", to: (r) => `/webhooks/${r.name}`, width: 180}),
-    textColumn({dataIndex: "organization", title: i18next.t("general:Organization"), width: 140, searchable: true}),
+    textColumn({dataIndex: "organization", title: i18next.t("general:Organization"), width: 140, searchable: true, link: (v) => `/organizations/${v}`}),
     dateColumn(),
-    textColumn({dataIndex: "url", title: i18next.t("general:URL"), width: 240, searchable: true}),
+    urlColumn({dataIndex: "url", title: i18next.t("general:URL"), width: 240}),
     textColumn({dataIndex: "method", title: i18next.t("general:Method"), width: 100, searchable: true}),
     textColumn({
       dataIndex: "contentType",
@@ -26,7 +26,7 @@ export default function WebhookListPage() {
     tagsColumn({dataIndex: "events", title: i18next.t("webhook:Events"), width: 220, sortable: true, searchable: true}),
     boolColumn({dataIndex: "isUserExtended", title: i18next.t("webhook:Is user extended")}),
     boolColumn({dataIndex: "singleOrgOnly", title: i18next.t("webhook:Single org only")}),
-    boolColumn({dataIndex: "isEnabled", title: i18next.t("general:Is enabled")}),
+    {...boolColumn({dataIndex: "isEnabled", title: i18next.t("general:Is enabled")}), fixed: "right" as const},
   ];
 
   return (

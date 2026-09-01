@@ -1,6 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
 import {AlertCircle} from "lucide-react";
+import {PoweredBy} from "@/components/layout/PoweredBy";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent} from "@/components/ui/card";
 import {LanguageSelect} from "@/components/common/LanguageSelect";
@@ -11,8 +12,8 @@ import {
   useApplicationTheme,
   useCustomHead,
 } from "@/hooks/use-application-chrome";
+import {useIsDark} from "@/hooks/use-theme";
 import * as Setting from "@/lib/setting";
-import * as Conf from "@/Conf";
 import {cn} from "@/lib/utils";
 
 interface AuthLayoutProps {
@@ -38,6 +39,9 @@ function BlockedMessage({message}: {message: string}) {
 /** Centered panel shared by the sign-in, sign-up, forget-password and result pages. */
 export function AuthLayout({application, children, className, wide}: AuthLayoutProps) {
   useApplicationTheme(application);
+  // an application can force the dark palette regardless of the visitor's own
+  // preference, and the logo has to follow the palette that is actually painted
+  const isDark = useIsDark();
   useApplicationHelmet(application);
   // headerHtml is the organization/application chrome, pageHtml is the per-page one
   useCustomHead(application?.headerHtml, "header");
@@ -54,8 +58,11 @@ export function AuthLayout({application, children, className, wide}: AuthLayoutP
     return <BlockedMessage message={ipRestriction} />;
   }
 
-  const logo =
-    application?.logo || cookieChrome.logo || `${Setting.StaticBaseUrl}/img/casdoor-logo_1185x256.png`;
+  const logo = Setting.getThemedLogo(
+    application?.logo || cookieChrome.logo,
+    application?.logoDark || application?.organizationObj?.logoDark,
+    [isDark ? "dark" : "light"],
+  );
   const footerHtml = application?.footerHtml || cookieChrome.footerHtml;
 
   return (
@@ -79,25 +86,22 @@ export function AuthLayout({application, children, className, wide}: AuthLayoutP
           <Card className="shadow-md">
             <CardContent className="p-6">{children}</CardContent>
           </Card>
-          {footerHtml ? (
-            <div
-              className="mt-6 text-center text-xs text-muted-foreground"
-              dangerouslySetInnerHTML={{__html: footerHtml}}
-            />
-          ) : (
-            <div className="mt-6 text-center text-xs text-muted-foreground">
-              {Conf.CustomFooter ?? (
-                <>
-                  Powered by{" "}
-                  <a href="https://casdoor.org" target="_blank" rel="noreferrer" className="hover:underline">
-                    Casdoor
-                  </a>
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
+
+      {/* below the centred card and at the bottom of the viewport, as antd's
+          Layout.Footer is a sibling of the Content it follows */}
+      {footerHtml ? (
+        <footer
+          id="footer"
+          className="shrink-0 py-4 text-center text-xs text-muted-foreground"
+          dangerouslySetInnerHTML={{__html: footerHtml}}
+        />
+      ) : (
+        <footer id="footer" className="shrink-0 py-4 text-center text-xs text-muted-foreground">
+          <PoweredBy />
+        </footer>
+      )}
     </div>
   );
 }

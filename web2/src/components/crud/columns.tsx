@@ -16,14 +16,19 @@ export function linkColumn<T extends Record<string, any>>(options: {
   sortable?: boolean;
   searchable?: boolean;
   text?: (record: T) => string;
+  /** set to false where the antd table does not pin the name column */
+  fixed?: false;
 }): ColumnDef<T> {
-  const {dataIndex, title, to, width = 140, sortable = true, searchable = true, text} = options;
+  const {dataIndex, title, to, width = 140, sortable = true, searchable = true, text, fixed} = options;
   return {
     dataIndex,
     title: title ?? i18next.t("general:Name"),
     width,
     sortable,
     searchable,
+    // antd pins the name column; DataTable ignores this unless the column
+    // actually leads the table, so a page that puts it later is unaffected
+    fixed: fixed === false ? undefined : "left",
     render: (value, record) => (
       <Link to={to(record)} className="font-medium text-foreground underline-offset-4 hover:underline">
         {text ? text(record) : value}
@@ -164,6 +169,8 @@ export function organizationColumn<T>(
   dataIndex = "owner",
   /** the rule and site lists head the same column "Owner" instead */
   title: React.ReactNode = i18next.t("general:Organization"),
+  /** pinned on the lists that lead with it and pin the name behind it */
+  fixed?: "left",
 ): ColumnDef<T> {
   return {
     dataIndex,
@@ -171,6 +178,7 @@ export function organizationColumn<T>(
     width,
     sortable: true,
     searchable: true,
+    fixed,
     render: (value) => (
       <Link to={`/organizations/${value}`} className="underline-offset-4 hover:underline">
         {value}
@@ -226,10 +234,17 @@ export function textColumn<T>(options: {
   searchable?: boolean;
   /** the header filter menu the antd column declared as `filters` */
   filters?: ColumnFilterOption[];
+  /** pins the column while the table scrolls sideways, antd's `fixed` */
+  fixed?: "left" | "right";
+  /** turns the cell into a link, keeping the search highlight inside it */
+  link?: (value: any, record: T) => string | undefined;
+  /** the link leaves Casdoor, so use an `<a target="_blank">` */
+  linkExternal?: boolean;
   mono?: boolean;
   className?: string;
 }): ColumnDef<T> {
-  const {dataIndex, title, width, sortable = true, searchable = false, filters, mono, className} = options;
+  const {dataIndex, title, width, sortable = true, searchable = false, filters, fixed, link, linkExternal, mono, className} =
+    options;
   return {
     dataIndex,
     title,
@@ -237,7 +252,46 @@ export function textColumn<T>(options: {
     sortable,
     searchable,
     filters,
+    fixed,
+    link,
+    linkExternal,
     className: cn(mono && "font-mono text-xs", className),
+  };
+}
+
+/**
+ * A cell holding a URL: shortened, and opening in a new tab. The antd tables cut
+ * these to 40-ish characters because a webhook or agent URL is far longer than
+ * its column.
+ */
+export function urlColumn<T>(options: {
+  dataIndex: string;
+  title: React.ReactNode;
+  width?: number | string;
+  searchable?: boolean;
+  /** what to open; defaults to the cell value */
+  href?: (value: string, record: T) => string;
+  /** characters to keep, as `Setting.getShortText` counts them */
+  max?: number;
+}): ColumnDef<T> {
+  const {dataIndex, title, width, searchable = true, href, max} = options;
+  return {
+    dataIndex,
+    title,
+    width,
+    sortable: true,
+    searchable,
+    render: (value: string, record: T) =>
+      value ? (
+        <a
+          href={href ? href(value, record) : value}
+          target="_blank"
+          rel="noreferrer"
+          className="underline-offset-4 hover:underline"
+        >
+          {max === undefined ? Setting.getShortText(value) : Setting.getShortText(value, max)}
+        </a>
+      ) : null,
   };
 }
 

@@ -202,6 +202,36 @@ export function getLogo(themes) {
   }
 }
 
+/**
+ * Casdoor's own wordmark, which `object/init.go` stores as the built-in
+ * organization's and application's logo. It is nearly black, so it disappears on
+ * a dark sidebar — but it has a `_dark` twin, which `getLogo` returns.
+ */
+function isDefaultCasdoorLogo(logo: string | undefined | null) {
+  return typeof logo === "string" && logo.endsWith("/img/casdoor-logo_1185x256.png");
+}
+
+/**
+ * The logo to paint for the current theme: an explicit `logoDark` wins in dark
+ * mode, an organization that never replaced Casdoor's default gets the dark
+ * twin of it, and a real custom logo is left alone — the deployment chose it.
+ */
+export function getThemedLogo(
+  logo: string | undefined | null,
+  logoDark: string | undefined | null,
+  themes: string[],
+) {
+  if (themes.includes("dark")) {
+    if (logoDark) {
+      return logoDark;
+    }
+    if (!logo || isDefaultCasdoorLogo(logo)) {
+      return getLogo(themes);
+    }
+  }
+  return logo || getLogo(themes);
+}
+
 
 export const Countries = [
   {label: "English", key: "en", country: "US", alt: "English"},
@@ -1875,7 +1905,13 @@ export function getCurrencyFlag(currency) {
   }
 
   return (
-    <img src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`} alt={`${currency} flag`} height={20} style={{marginRight: 5}} />
+    // Tailwind's preflight sets `img { height: auto }`, which beats the `height`
+    // attribute the antd frontend relies on — so the size has to be a class
+    <img
+      src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`}
+      alt={`${currency} flag`}
+      className="mr-1.5 inline-block h-5 w-auto align-text-bottom"
+    />
   );
 }
 
@@ -1891,7 +1927,11 @@ export function getCurrencyWithFlag(currency) {
 
   return (
     <span>
-      <img src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`} alt={`${currency} flag`} height={20} style={{marginRight: 5}} />
+      <img
+        src={`${StaticBaseUrl}/flag-icons/${countryCode}.svg`}
+        alt={`${currency} flag`}
+        className="mr-1.5 inline-block h-5 w-auto align-text-bottom"
+      />
       {currencyText}
     </span>
   );
@@ -1917,7 +1957,9 @@ export function getUserCommonFields() {
 }
 
 export function getDefaultFooterContent() {
-  return `Powered by <a target="_blank" href="https://casdoor.org" rel="noreferrer"><img style="padding-bottom: 3px" height="20" alt="Casdoor" src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png"/></a>`;
+  // the height is inline rather than an attribute: this HTML is injected into the
+  // page, where Tailwind's preflight would otherwise reset it to `height: auto`
+  return `Powered by <a target="_blank" href="https://casdoor.org" rel="noreferrer"><img style="display: inline-block; height: 20px; width: auto; padding-bottom: 3px" alt="Casdoor" src="${StaticBaseUrl}/img/casdoor-logo_1185x256.png"/></a>`;
 }
 
 export function getEmptyFooterContent() {

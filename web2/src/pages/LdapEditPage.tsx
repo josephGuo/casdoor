@@ -112,6 +112,9 @@ export default function LdapEditPage() {
       <FormRow labelKey="general:Organization">
         <Input value={ldap.owner ?? organizationName} disabled />
       </FormRow>
+      <FormRow labelKey="general:ID">
+        <Input value={ldap.id ?? ""} disabled />
+      </FormRow>
       <FormRow labelKey="ldap:Server name">
         <Input value={ldap.serverName ?? ""} onChange={(e) => update("serverName", e.target.value)} />
       </FormRow>
@@ -196,6 +199,11 @@ export default function LdapEditPage() {
           ]}
         />
       </FormRow>
+      {ldap.autoSync > 0 ? (
+        <p className="pl-1 text-sm text-warning">
+          {i18next.t("ldap:The Auto Sync option will sync all users to specify organization")}
+        </p>
+      ) : null}
       <FormRow labelKey="ldap:Default group">
         <MultiSelect
           value={ldap.defaultGroups ?? []}

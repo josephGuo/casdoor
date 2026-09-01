@@ -10,8 +10,8 @@ export default function VerificationListPage() {
   const organizationName = useRequestOrganization();
 
   const columns: ColumnDef<any>[] = [
-    organizationColumn(),
-    textColumn({dataIndex: "name", title: i18next.t("general:Name"), width: 180, searchable: true}),
+    organizationColumn(140, "owner", undefined, "left"),
+    textColumn({dataIndex: "name", title: i18next.t("general:Name"), width: 180, searchable: true, fixed: "left"}),
     dateColumn(),
     textColumn({dataIndex: "type", title: i18next.t("general:Type"), width: 110, searchable: true}),
     {
@@ -26,7 +26,7 @@ export default function VerificationListPage() {
         </Link>
       ),
     },
-    textColumn({dataIndex: "provider", title: i18next.t("general:Provider"), width: 160, searchable: true}),
+    textColumn({dataIndex: "provider", title: i18next.t("general:Provider"), width: 160, searchable: true, link: (v, r: any) => `/providers/${r.owner}/${v}`}),
     clientIpColumn({
       dataIndex: "remoteAddr",
       // the backend stores it as "1.2.3.4: " when the port is unknown

@@ -23,6 +23,12 @@ export default function UserListPage() {
   const navigate = useNavigate();
   const groupName = searchParams.get("groupName") ?? "";
   const organizationName = useRequestOrganization(params.organizationName);
+
+  // antd stops you removing or deleting yourself, or the built-in admin
+  const isProtected = (record: any) =>
+    (record.owner === account?.owner && record.name === account?.name) ||
+    (record.owner === "built-in" && record.name === "admin");
+
   const [organization, setOrganization] = React.useState<any>({});
 
   React.useEffect(() => {
@@ -39,11 +45,12 @@ export default function UserListPage() {
   const isGlobal = account ? Setting.isDefaultOrganizationSelected(account) && !params.organizationName : false;
 
   const columns: ColumnDef<any>[] = [
-    organizationColumn(),
+    organizationColumn(140, "owner", undefined, "left"),
     {
       dataIndex: "signupApplication",
       title: i18next.t("general:Application"),
       width: 140,
+      fixed: "left",
       sortable: true,
       searchable: true,
       render: (value, record) =>
@@ -63,13 +70,21 @@ export default function UserListPage() {
       align: "center",
       render: (_value, record) => {
         const url = Setting.getEffectiveAvatarUrl(record);
-        return (
+        // antd links the avatar to the image itself
+        const avatar = (
           <Avatar className="mx-auto h-9 w-9">
             {url ? <AvatarImage src={url} alt={record.name} /> : null}
             <AvatarFallback style={{backgroundColor: Setting.getAvatarColor(record.name), color: "#fff"}}>
               {(record.name || "?").charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
+        );
+        return url ? (
+          <a href={url} target="_blank" rel="noreferrer">
+            {avatar}
+          </a>
+        ) : (
+          avatar
         );
       },
     },
@@ -153,13 +168,14 @@ export default function UserListPage() {
           )
       }
       newRecord={account ? () => newUser(account, organization, organizationName, groupName) : undefined}
+      deleteDisabled={isProtected}
       editUrl={(r) => `/users/${r.owner}/${r.name}`}
       remove={(r) => UserBackend.deleteUser(r)}
       rowActions={(record, _index, {refresh}) => (
         <>
           {Setting.isLocalAdminUser(account) && record.name !== account?.name ? (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => {
                 UserBackend.impersonateUser(record.owner, record.name).then((res: any) => {
@@ -180,7 +196,10 @@ export default function UserListPage() {
             <ConfirmButton
               variant="outline"
               size="sm"
+              // "remove from group", not "delete", so it asks its own question
+              title={i18next.t("general:Sure to remove")}
               description={`${record.name ?? ""}`}
+              disabled={isProtected(record)}
               onConfirm={() =>
                 UserBackend.removeUserFromGroup({groupName, owner: record.owner, name: record.name})
                   .then((res: any) => {

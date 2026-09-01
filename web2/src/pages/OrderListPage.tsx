@@ -31,7 +31,17 @@ export default function OrderListPage() {
       title: i18next.t("order:Price"),
       width: 120,
       sortable: true,
-      render: (value, record) => Setting.getPriceDisplay(value, record.currency),
+      // a paid order links to the payment that settled it
+      render: (value, record) => {
+        const price = Setting.getPriceDisplay(value, record.currency);
+        return record.payment ? (
+          <Link to={`/payments/${record.owner}/${record.payment}`} className="underline-offset-4 hover:underline">
+            {price}
+          </Link>
+        ) : (
+          price
+        );
+      },
     },
     {
       dataIndex: "user",
@@ -71,7 +81,7 @@ export default function OrderListPage() {
       rowActions={(record, _index, {refresh}) => (
         <>
           {/* the same page pays an unpaid order and shows a paid one */}
-          <Button variant="ghost" size="sm" asChild>
+          <Button variant="outline" size="sm" asChild>
             <Link to={`/orders/${record.owner}/${record.name}/pay`}>
               {record.state === "Created" || record.state === "Failed"
                 ? i18next.t("order:Pay")
@@ -81,7 +91,7 @@ export default function OrderListPage() {
           {/* only an admin may cancel, and only an order nobody has paid for yet */}
           {record.state === "Created" && Setting.isLocalAdminUser(account) ? (
             <ConfirmButton
-              variant="outline"
+              variant="destructive"
               size="sm"
               description={`${record.name ?? ""}`}
               onConfirm={() =>
