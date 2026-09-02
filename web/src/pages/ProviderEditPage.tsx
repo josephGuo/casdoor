@@ -508,11 +508,11 @@ export default function ProviderEditPage() {
     const requiredKeys = ["id", "username", "displayName"];
     if (provider.type === "Custom HTTP Email") {
       if (value === "") {
-        Setting.showMessage("error", i18next.t("provider:This field is required"));
+        Setting.showMessage("error", i18next.t("general:This field is required"));
         return;
       }
     } else if (value === "" && requiredKeys.includes(key)) {
-      Setting.showMessage("error", i18next.t("provider:This field is required"));
+      Setting.showMessage("error", i18next.t("general:This field is required"));
       return;
     }
 
@@ -1604,6 +1604,7 @@ export default function ProviderEditPage() {
 
   return (
     <EditPageShell
+      grid
       title={mode === "add" ? i18next.t("provider:New Provider") : i18next.t("provider:Edit Provider")}
       mode={mode}
       backTo="/providers"

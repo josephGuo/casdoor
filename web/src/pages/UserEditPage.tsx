@@ -1,7 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
 import {Link, useNavigate, useParams} from "react-router-dom";
-import {Users} from "lucide-react";
+import {ShieldCheck, Users} from "lucide-react";
 import {UnauthorizedPage} from "@/components/common/UnauthorizedPage";
 import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert";
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
@@ -19,7 +19,7 @@ import {RegionSelect} from "@/components/common/RegionSelect";
 import {SearchableSelect} from "@/components/common/SearchableSelect";
 import {EditPageShell} from "@/components/crud/EditPageShell";
 import {EditableTable} from "@/components/crud/EditableTable";
-import {FormRow} from "@/components/crud/FormRow";
+import {FormRow, formGridClass} from "@/components/crud/FormRow";
 import {AffiliationAddressSelect, AffiliationField, useAffiliation} from "@/components/user/AffiliationSelect";
 import {CartTable} from "@/components/user/CartTable";
 import {CasdoorAppQrCode, CasdoorAppUrl} from "@/components/user/CasdoorAppConnector";
@@ -248,7 +248,7 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
             <TabsTrigger value="authorization">{i18next.t("general:Authorization")}</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="account">
+          <TabsContent value="account" className={formGridClass}>
             <AccountItemRow name="Organization" labelKey="general:Organization">
               <SearchableSelect
                 value={user.owner}
@@ -364,7 +364,7 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
             </AccountItemRow>
           </TabsContent>
 
-          <TabsContent value="profile">
+          <TabsContent value="profile" className={formGridClass}>
             <AccountItemRow name="Country/Region" labelKey="user:Country/Region">
               <Input value={user.region ?? ""} onChange={(e) => updateField("region", e.target.value)} />
             </AccountItemRow>
@@ -643,7 +643,7 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
             </AccountItemRow>
           </TabsContent>
 
-          <TabsContent value="security">
+          <TabsContent value="security" className={formGridClass}>
             <AccountItemRow name="Password" labelKey="general:Password">
               {/* set-password needs an existing user, so in "add" mode the initial
                 password is edited directly on the user to be created */}
@@ -956,7 +956,7 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
             </AccountItemRow>
           </TabsContent>
 
-          <TabsContent value="authorization">
+          <TabsContent value="authorization" className={formGridClass}>
             <AccountItemRow name="Roles" labelKey="general:Roles">
               <div className="flex flex-wrap gap-1">
                 {(user.roles ?? []).length === 0 ? (
@@ -992,11 +992,36 @@ export default function UserEditPage({self}: {self?: boolean} = {}) {
                 {(user.permissions ?? []).length === 0 ? (
                   <span className="text-sm text-muted-foreground">{i18next.t("general:No data")}</span>
                 ) : (
-                  (user.permissions ?? []).map((permission: any) => (
-                    <Badge key={`${permission.owner}/${permission.name}`} variant="secondary">
-                      {permission.name}
-                    </Badge>
-                  ))
+                  (user.permissions ?? []).map((permission: any) => {
+                    const sourceGroups: string[] = permission.sourceGroups ?? [];
+                    const sourceRoles: string[] = permission.sourceRoles ?? [];
+                    const key = `${permission.owner}/${permission.name}`;
+                    if (sourceGroups.length === 0 && sourceRoles.length === 0) {
+                      return (
+                        <Badge key={key} variant="secondary">
+                          {permission.name}
+                        </Badge>
+                      );
+                    }
+                    const sourceTexts: string[] = [];
+                    if (sourceRoles.length !== 0) {
+                      sourceTexts.push(`${i18next.t("general:Roles")}: ${sourceRoles.join(", ")}`);
+                    }
+                    if (sourceGroups.length !== 0) {
+                      sourceTexts.push(`${i18next.t("general:Groups")}: ${sourceGroups.join(", ")}`);
+                    }
+                    return (
+                      <Tooltip key={key}>
+                        <TooltipTrigger asChild>
+                          <Badge variant="outline" className="cursor-default">
+                            {sourceRoles.length !== 0 ? <ShieldCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+                            {permission.name}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>{sourceTexts.join(" | ")}</TooltipContent>
+                      </Tooltip>
+                    );
+                  })
                 )}
               </div>
             </AccountItemRow>
