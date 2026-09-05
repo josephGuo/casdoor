@@ -663,7 +663,7 @@ export const UserFields = ["owner", "name", "password", "display_name", "id", "t
   "eveonline", "fitbit", "gitea", "heroku", "influxcloud", "instagram", "intercom", "kakao", "lastfm", "mailru",
   "meetup", "microsoftonline", "naver", "nextcloud", "onedrive", "oura", "patreon", "paypal", "salesforce", "shopify",
   "soundcloud", "spotify", "strava", "stripe", "tiktok", "tumblr", "twitch", "twitter", "typetalk", "uber", "vk",
-  "wepay", "xero", "yahoo", "yammer", "yandex", "zoom", "metamask", "web3onboard", "custom", "webauthnCredentials",
+  "wepay", "xero", "yahoo", "yammer", "yandex", "zoom", "metamask", "web3onboard", "oidc", "custom", "webauthnCredentials",
   "preferred_mfa_type", "recovery_codes", "totp_secret", "mfa_phone_enabled", "mfa_email_enabled", "invitation",
   "invitation_code", "face_ids", "ldap", "properties", "roles", "permissions", "groups", "last_change_password_time",
   "last_signin_wrong_time", "signin_wrong_times", "managedAccounts", "mfaAccounts", "mfaItems", "need_update_password",
@@ -1196,12 +1196,12 @@ export function trim(str, ch) {
   return (start > 0 || end < str.length) ? str.substring(start, end) : str;
 }
 
+// A custom CSS value may or may not already be wrapped in <style> tags, the editor accepts both.
 export function getStyleInnerCss(css) {
   if (!css) {
     return css;
   }
-  const match = css.match(/^\s*<style[^>]*>([\s\S]*?)<\/style>\s*$/i);
-  return match ? match[1] : css;
+  return css.replace(/<\/?style[^>]*>/gi, "");
 }
 
 export function getShortText(s, maxLength = 35) {
@@ -1631,6 +1631,21 @@ export function getSigninItem(application, name) {
 // An item the application does not list at all keeps its default place on the page.
 export function isSigninItemVisible(application, name) {
   return getSigninItem(application, name)?.visible !== false;
+}
+
+// "Text 1".."Text 5" and the items added by the admin carry raw HTML instead of a widget.
+export function isCustomFormItem(item) {
+  return item?.isCustom === true || `${item?.name ?? ""}`.startsWith("Text ");
+}
+
+// An unset Providers rule means "small" next to a credential form and "big" without one.
+export function getProvidersRule(application, item) {
+  if (item?.rule && item.rule !== "None") {
+    return item.rule;
+  }
+  const showForm = isPasswordEnabled(application) || isCodeSigninEnabled(application) ||
+    isWebAuthnEnabled(application) || isLdapEnabled(application);
+  return showForm ? "small" : "big";
 }
 
 export function getAutoSigninDefaultValue(application) {
