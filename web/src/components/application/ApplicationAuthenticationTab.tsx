@@ -13,7 +13,7 @@ export function ApplicationAuthenticationTab({application, updateField}: Applica
       <FormRow labelKey="application:Cookie expire">
         <Input
           type="number"
-          value={application.cookieExpireInHours ?? 720}
+          value={application.cookieExpireInHours || 720}
           onChange={(e) => updateField("cookieExpireInHours", Setting.myParseInt(e.target.value))}
         />
       </FormRow>
@@ -26,12 +26,15 @@ export function ApplicationAuthenticationTab({application, updateField}: Applica
       <FormRow labelKey="application:Disable signin">
         <Switch checked={!!application.disableSignin} onCheckedChange={(v) => updateField("disableSignin", v)} />
       </FormRow>
-      <FormRow labelKey="application:Enable guest signin">
-        <Switch
-          checked={!!application.enableGuestSignin}
-          onCheckedChange={(v) => updateField("enableGuestSignin", v)}
-        />
-      </FormRow>
+      {/* the built-in organization has no guests to sign in */}
+      {application.organization !== "built-in" ? (
+        <FormRow labelKey="application:Enable guest signin">
+          <Switch
+            checked={!!application.enableGuestSignin}
+            onCheckedChange={(v) => updateField("enableGuestSignin", v)}
+          />
+        </FormRow>
+      ) : null}
       <FormRow labelKey="application:Enable exclusive signin">
         <Switch
           checked={!!application.enableExclusiveSignin}

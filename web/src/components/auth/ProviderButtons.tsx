@@ -15,6 +15,8 @@ interface ProviderButtonsProps {
   method: "signup" | "signin" | "link";
   /** the item rule: "big" for a labelled button per provider, "small" for a logo grid */
   rule?: string;
+  /** return false to swallow the click, e.g. on an unaccepted agreement */
+  onBeforeClick?: () => boolean;
 }
 
 /** SAML sign-in goes through /api/get-saml-login, which answers with a redirect or a POST form. */
@@ -45,7 +47,7 @@ function goToSamlUrl(provider: any, search: string) {
  * /callback keeps working unchanged. SAML, Web3 and the WeChat media platform
  * take their own paths, as in web/src/auth/ProviderButton.js.
  */
-export function ProviderButtons({application, method, rule}: ProviderButtonsProps) {
+export function ProviderButtons({application, method, rule, onBeforeClick}: ProviderButtonsProps) {
   const location = useLocation();
   const [wechatItem, setWechatItem] = React.useState<any>(null);
 
@@ -101,6 +103,13 @@ export function ProviderButtons({application, method, rule}: ProviderButtonsProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hintedName]);
 
+  const onClick = (providerItem: any) => {
+    if (onBeforeClick && onBeforeClick() === false) {
+      return;
+    }
+    goTo(providerItem);
+  };
+
   if (items.length === 0) {
     return null;
   }
@@ -127,7 +136,7 @@ export function ProviderButtons({application, method, rule}: ProviderButtonsProp
             type="button"
             variant="outline"
             className="provider-big-img w-full justify-center gap-2"
-            onClick={() => goTo(item)}
+            onClick={() => onClick(item)}
           >
             <img
               src={Setting.getProviderLogoURL(item.provider)}
@@ -149,7 +158,7 @@ export function ProviderButtons({application, method, rule}: ProviderButtonsProp
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={() => goTo(item)}
+              onClick={() => onClick(item)}
               className="flex h-10 w-10 items-center justify-center rounded-md border transition-colors hover:bg-accent"
             >
               <img

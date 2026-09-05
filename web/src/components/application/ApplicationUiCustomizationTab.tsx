@@ -8,6 +8,7 @@ import {SelectField} from "@/components/common/SelectField";
 import {TagsInput} from "@/components/common/TagsInput";
 import {ThemeEditor} from "@/components/common/ThemeEditor";
 import {EditableTable} from "@/components/crud/EditableTable";
+import {ApplicationPromptPreview, ApplicationSignupSigninPreview} from "@/components/application/ApplicationPreview";
 import {FormRow} from "@/components/crud/FormRow";
 import type {ApplicationTabProps} from "@/components/application/types";
 import {enumSelectOptions, type EnumMap} from "@/lib/enum-labels";
@@ -103,9 +104,10 @@ const SIGNIN_ITEM_NAMES: {name: string; labelKey: string}[] = [
 ];
 
 const SIGNUP_ITEM_NAMES = [
-  "ID", "Username", "Display name", "Affiliation", "ID card", "Country/Region", "Email", "Phone",
-  "Email or Phone", "Phone or Email", "Password", "Confirm password", "Invitation code", "Agreement",
-  "Signup button", "Providers", "Text 1", "Text 2", "Text 3", "Text 4", "Text 5", "Languages",
+  "Username", "ID", "Display name", "First name", "Last name", "Affiliation", "Gender", "Bio", "Tag",
+  "Education", "Country/Region", "ID card", "Password", "Confirm password", "Email", "Phone",
+  "Email or Phone", "Phone or Email", "Invitation code", "Agreement", "Signup button", "Providers",
+  "Languages", "Text 1", "Text 2", "Text 3", "Text 4", "Text 5",
 ];
 
 /** Only a few signin items take a rule, and each has its own option set. */
@@ -142,7 +144,7 @@ export function ApplicationUiCustomizationTab({application, updateField}: Applic
     <>
       <FormRow block labelKey="application:Org choice mode">
         <SelectField
-          value={application.orgChoiceMode ?? "None"}
+          value={application.orgChoiceMode || "None"}
           onChange={(v) => updateField("orgChoiceMode", v)}
           options={[
             {id: "None", name: i18next.t("general:None")},
@@ -354,7 +356,7 @@ export function ApplicationUiCustomizationTab({application, updateField}: Applic
               width: 160,
               render: (row: any, _i, patch) => (
                 <SelectField
-                  value={row.type ?? "Input"}
+                  value={row.type || "Input"}
                   onChange={(v) => patch({type: v})}
                   options={enumSelectOptions(SIGNUP_ITEM_TYPES)}
                 />
@@ -425,6 +427,9 @@ export function ApplicationUiCustomizationTab({application, updateField}: Applic
             },
           ]}
         />
+      </FormRow>
+      <FormRow labelKey="general:Preview" block>
+        <ApplicationSignupSigninPreview application={application} />
       </FormRow>
       <FormRow block labelKey="application:Background URL">
         <Input
@@ -518,6 +523,11 @@ export function ApplicationUiCustomizationTab({application, updateField}: Applic
           </Button>
         </div>
       </FormRow>
+      {Setting.hasPromptPage(application) ? (
+        <FormRow labelKey="general:Preview" block>
+          <ApplicationPromptPreview application={application} />
+        </FormRow>
+      ) : null}
     </>
   );
 }

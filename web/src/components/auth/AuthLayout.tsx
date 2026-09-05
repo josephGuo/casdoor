@@ -27,6 +27,14 @@ interface AuthLayoutProps {
   /** the sign-in page drives these two slots from its own signinItems */
   hideLogo?: boolean;
   hideLanguages?: boolean;
+  /** told which language the visitor picked, so the signup page can save it */
+  onLanguageChange?: (key: string) => void;
+  /**
+   * Rendered inside the application editor's preview: the application's theme,
+   * title, favicon and custom head belong to the visitor's page, not to the
+   * console the preview is embedded in.
+   */
+  preview?: boolean;
 }
 
 /** The "we cannot sign you in" panel, port of auth/Util.js renderMessageLarge(). */
@@ -42,16 +50,16 @@ function BlockedMessage({message}: {message: string}) {
 }
 
 /** Centered panel shared by the sign-in, sign-up, forget-password and result pages. */
-export function AuthLayout({application, children, className, wide, hideLogo, hideLanguages}: AuthLayoutProps) {
-  useApplicationTheme(application);
+export function AuthLayout({application, children, className, wide, hideLogo, hideLanguages, onLanguageChange, preview}: AuthLayoutProps) {
+  useApplicationTheme(application, !preview);
   // an application can force the dark palette regardless of the visitor's own
   // preference, and the logo has to follow the palette that is actually painted
   const isDark = useIsDark();
   const isMobile = useIsMobile();
-  useApplicationHelmet(application);
+  useApplicationHelmet(preview ? null : application);
   // headerHtml is the organization/application chrome, pageHtml is the per-page one
-  useCustomHead(application?.headerHtml, "header");
-  useCustomHead(application?.pageHtml, "page");
+  useCustomHead(preview ? undefined : application?.headerHtml, "header");
+  useCustomHead(preview ? undefined : application?.pageHtml, "page");
 
   // the backend hands us the organization's branding in cookies so the first
   // paint is already branded, before /api/get-application has come back
@@ -89,7 +97,7 @@ export function AuthLayout({application, children, className, wide, hideLogo, hi
       {embedded ? null : <CustomStyle css={isMobile ? application?.formCssMobile : application?.formCss} />}
 
       <div className="flex items-center justify-end gap-1 p-3">
-        {hideLanguages ? null : <LanguageSelect languages={application?.organizationObj?.languages} />}
+        {hideLanguages ? null : <LanguageSelect languages={application?.organizationObj?.languages} onLanguageChange={onLanguageChange} />}
         <ThemeToggle />
       </div>
 
@@ -99,11 +107,17 @@ export function AuthLayout({application, children, className, wide, hideLogo, hi
           offset === 1 ? "justify-start sm:pl-[10%]" : offset === 3 ? "justify-end sm:pr-[10%]" : "justify-center",
         )}
       >
-        <div className={cn("login-panel flex w-full items-center gap-8", sidePanel ? "max-w-4xl" : wide ? "max-w-xl" : "max-w-sm")}>
+        {/* one box: an application's own `.login-panel` styles the card itself */}
+        <Card
+          className={cn(
+            "login-panel flex w-full items-center overflow-hidden shadow-md",
+            sidePanel ? "max-w-4xl" : wide ? "max-w-xl" : "max-w-md",
+          )}
+        >
           {sidePanel ? (
-            <CustomHtml html={application.formSideHtml} className="side-image hidden w-[420px] shrink-0 lg:block" />
+            <CustomHtml html={application.formSideHtml} className="side-image hidden w-[420px] shrink-0 self-stretch lg:block" />
           ) : null}
-          <div className={cn("login-form w-full", className)}>
+          <CardContent className={cn("login-form w-full min-w-0 p-4 sm:p-6", className)}>
             {hideLogo ? null : (
               <div className="login-logo-box mb-6 flex justify-center">
                 {application?.homepageUrl ? (
@@ -115,11 +129,9 @@ export function AuthLayout({application, children, className, wide, hideLogo, hi
                 )}
               </div>
             )}
-            <Card className="shadow-md">
-              <CardContent className="p-6">{children}</CardContent>
-            </Card>
-          </div>
-        </div>
+            {children}
+          </CardContent>
+        </Card>
       </div>
 
       {/* below the centred card and at the bottom of the viewport, as antd's

@@ -6,17 +6,21 @@ import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
+import {CountryCodeSelect} from "@/components/common/CountryCodeSelect";
 import {Loading} from "@/components/common/Loading";
 import {MultiSelect} from "@/components/common/MultiSelect";
+import {PasswordInput} from "@/components/common/PasswordInput";
 import {SearchableSelect} from "@/components/common/SearchableSelect";
 import {RegionSelect} from "@/components/common/RegionSelect";
 import {CustomHtml, CustomStyle} from "@/components/common/CustomHtml";
 import {AuthLayout} from "@/components/auth/AuthLayout";
-import {AgreementCheckbox} from "@/components/auth/AgreementModal";
+import {AgreementCheckbox, getAgreementDefaultValue} from "@/components/auth/AgreementModal";
 import {ProviderButtons} from "@/components/auth/ProviderButtons";
 import {SendCodeInput} from "@/components/auth/SendCodeInput";
 import {CaptchaModal} from "@/components/common/CaptchaModal";
 import {getCaptchaProvider} from "@/lib/captcha";
+import {PasswordRequirements} from "@/lib/password-checker";
+import {useAccount} from "@/hooks/use-account";
 import {authConfig} from "@/auth/Auth";
 import * as Util from "@/auth/Util";
 import * as ApplicationBackend from "@/backend/ApplicationBackend";
@@ -39,10 +43,24 @@ const SIMPLE_TEXT_ITEMS: Record<string, string> = {
   "Invitation code": "application:Invitation code",
 };
 
-export default function SignupPage() {
+/** Where the antd class name differs from the field, so `customCss` keeps matching. */
+const FIELD_CLASS_NAMES: Record<string, string> = {
+  firstName: "first-name",
+  lastName: "last-name",
+  idCard: "idcard",
+  invitationCode: "invitation-code",
+};
+
+function fieldClass(field: string): string {
+  return `signup-${FIELD_CLASS_NAMES[field] ?? field}`;
+}
+
+/** the application editor's live preview hands the form's own object over */
+export default function SignupPage({application: applicationProp}: {application?: any} = {}) {
   const params = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const {reload} = useAccount();
 
   const [application, setApplication] = React.useState<any>(undefined);
   const [msg, setMsg] = React.useState<string | null>(null);
@@ -53,10 +71,25 @@ export default function SignupPage() {
   const [captchaVisible, setCaptchaVisible] = React.useState(false);
   const [pendingValues, setPendingValues] = React.useState<any>(null);
   const [emailOrPhoneMode, setEmailOrPhoneMode] = React.useState("");
+  const [invitation, setInvitation] = React.useState<any>(undefined);
+  const [passwordFocused, setPasswordFocused] = React.useState(false);
+  const [userLang, setUserLang] = React.useState("");
 
   const applicationName = params.applicationName ?? authConfig.appName;
 
   React.useEffect(() => {
+    if (applicationProp) {
+      setApplication(applicationProp);
+      setAgreed(getAgreementDefaultValue(applicationProp));
+      setValues((prev) => ({
+        ...prev,
+        application: applicationProp.name,
+        organization: applicationProp.organization,
+        countryCode: prev.countryCode ?? applicationProp.organizationObj?.countryCodes?.[0] ?? "",
+      }));
+      return;
+    }
+
     const oAuthParams = Util.getOAuthGetParameters();
     if (oAuthParams) {
       // the OAuth params live on the signin path, remember it to get back there after the signup
@@ -70,22 +103,28 @@ export default function SignupPage() {
       .then((res: any) => {
         if (res.status === "ok" && res.data) {
           setApplication(res.data);
+          setAgreed(getAgreementDefaultValue(res.data));
           const invitationCode = searchParams.get("invitationCode") ?? "";
           setValues((prev) => ({
             ...prev,
             application: res.data.name,
             organization: res.data.organization,
             invitationCode,
+            // the antd CountryCodeSelect seeded the form with it, so the phone
+            // code request and the signup payload carry it even if untouched
+            countryCode: prev.countryCode ?? res.data.organizationObj?.countryCodes?.[0] ?? "",
           }));
-          // an invitation can pin the email or phone the account must be created with
+          // an invitation can pin the username, email or phone the account must be created with
           if (invitationCode !== "") {
             InvitationBackend.getInvitationCodeInfo(invitationCode, `admin/${res.data.name}`).then((infoRes: any) => {
               if (infoRes.status === "error") {
                 Setting.showMessage("error", infoRes.msg);
                 return;
               }
+              setInvitation(infoRes.data);
               setValues((prev) => ({
                 ...prev,
+                ...(infoRes.data?.username ? {username: infoRes.data.username} : {}),
                 ...(infoRes.data?.email ? {email: infoRes.data.email} : {}),
                 ...(infoRes.data?.phone ? {phone: infoRes.data.phone} : {}),
               }));
@@ -101,7 +140,22 @@ export default function SignupPage() {
         setMsg(`${i18next.t("general:Failed to connect to server")}: ${error}`);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applicationName]);
+  }, [applicationName, applicationProp]);
+
+  const signupItems = (application?.signupItems ?? []) as any[];
+  const languagesItem = signupItems.find((item: any) => item.name === "Languages");
+  const languages = application?.organizationObj?.languages as string[] | undefined;
+  // an organization that offers a single language forces it rather than offering a choice
+  const forcedLanguage =
+    (!languagesItem || languagesItem.visible) && languages && languages.length <= 1
+      ? (languages.length === 1 ? languages[0] : "en")
+      : "";
+
+  React.useEffect(() => {
+    if (forcedLanguage !== "" && Setting.getLanguage() !== forcedLanguage) {
+      Setting.setLanguage(forcedLanguage);
+    }
+  }, [forcedLanguage]);
 
   const set = (key: string, value: any) => {
     setValues((prev) => ({...prev, [key]: value}));
@@ -113,13 +167,20 @@ export default function SignupPage() {
   const fieldError = (field: string) =>
     errors[field] ? <p className="text-xs text-destructive">{errors[field]}</p> : null;
 
+  const renderLabel = (text: React.ReactNode, required?: boolean, htmlFor?: string) => (
+    <Label htmlFor={htmlFor}>
+      {required ? <span className="mr-1 text-destructive">*</span> : null}
+      {text}
+    </Label>
+  );
+
   if (application === undefined) {
     return <Loading className="min-h-screen" />;
   }
 
   if (application === null) {
     return (
-      <AuthLayout>
+      <AuthLayout preview={!!applicationProp}>
         <Alert variant="destructive">
           <AlertDescription>{msg ?? i18next.t("application:Failed to sign in")}</AlertDescription>
         </Alert>
@@ -127,18 +188,24 @@ export default function SignupPage() {
     );
   }
 
+  const signinLink = Setting.getStoredSigninUrl() || Setting.getLoginLink(application) || "/login";
+
   if (!application.enableSignUp) {
     return (
-      <AuthLayout application={application}>
-        <Alert variant="warning">
-          <AlertDescription>{i18next.t("application:The application does not allow to sign up new account")}</AlertDescription>
-        </Alert>
+      <AuthLayout preview={!!applicationProp} application={application}>
+        <div className="space-y-4">
+          <Alert variant="warning">
+            <AlertDescription>{i18next.t("application:The application does not allow to sign up new account")}</AlertDescription>
+          </Alert>
+          <Button className="w-full" onClick={() => Setting.goToLink(signinLink)}>
+            {i18next.t("login:Sign In")}
+          </Button>
+        </div>
       </AuthLayout>
     );
   }
 
   const captchaProvider = getCaptchaProvider(application);
-  const signupItems = (application.signupItems ?? []) as any[];
   const items = signupItems.filter((item: any) => item.visible);
   // "First, last" splits the display name into two fields, which then replace the
   // separate First name / Last name items; Chinese names are not split
@@ -150,6 +217,17 @@ export default function SignupPage() {
   const emailOrPhoneItem = (item: any) => {
     const mode = emailOrPhoneMode || (item.name === "Email or Phone" ? "Email" : "Phone");
     return {...item, name: mode};
+  };
+
+  const agreementItem = signupItems.find((item: any) => item.name === "Agreement" && item.visible);
+
+  /** the agreement gates the provider buttons too */
+  const checkAgreement = () => {
+    if (agreementItem?.required && !agreed) {
+      Setting.showMessage("error", i18next.t("signup:Please accept the agreement!"));
+      return false;
+    }
+    return true;
   };
 
   const submit = (e: React.FormEvent) => {
@@ -175,7 +253,14 @@ export default function SignupPage() {
       plan: searchParams.get("plan"),
       pricing: searchParams.get("pricing"),
       agreement: agreed,
+      language: userLang,
     };
+    // a "Multiple Choices" item edits an array, the backend field is a string
+    Object.keys(payload).forEach((key) => {
+      if (Array.isArray(payload[key])) {
+        payload[key] = payload[key].join(", ");
+      }
+    });
 
     const captchaRule = Setting.getCaptchaRule(application);
     if (captchaRule === Setting.CaptchaRule.Always) {
@@ -204,6 +289,20 @@ export default function SignupPage() {
     submitSignup(payload);
   };
 
+  const getResultPath = (payload: Record<string, any>, username: string) => {
+    if (payload.plan && payload.pricing) {
+      // the prompt page needs the user to be signed in, so a paid signup goes to buy-plan
+      return `/buy-plan/${application.organization}/${payload.pricing}?user=${username}&plan=${payload.plan}`;
+    }
+    if (authConfig.appName === application.name) {
+      return "/result";
+    }
+    if (Setting.hasPromptPage(application)) {
+      return `/prompt/${application.name}?oauth=${Util.getOAuthGetParameters() !== null}`;
+    }
+    return `/result/${application.name}`;
+  };
+
   const submitSignup = (payload: Record<string, any>) => {
     setLoading(true);
     const oAuthParams = Util.getOAuthGetParameters();
@@ -225,11 +324,18 @@ export default function SignupPage() {
           Setting.goToLink(`/consent/${application.name}?${window.location.search.substring(1)}`);
           return;
         }
+        // the id of the new user comes back from signup(); a phone-only signup has no username
         let username = payload.username;
         if (typeof res.data === "string") {
           username = res.data.split("/")[1];
         }
-        navigate(`/result/${application.name}`, {state: {username}});
+        const path = getResultPath(payload, username);
+        // the prompt page renders the signed-in account, so it has to be loaded first
+        if (Setting.hasPromptPage(application) && (!payload.plan || !payload.pricing)) {
+          reload().then(() => navigate(path, {state: {username}}));
+          return;
+        }
+        navigate(path, {state: {username}});
       })
       .finally(() => setLoading(false));
   };
@@ -237,13 +343,15 @@ export default function SignupPage() {
   const renderEmail = (item: any) => (
     <React.Fragment key={`${item.name}-email`}>
       <div className="signup-email space-y-2">
-        <Label htmlFor="email">{item.label || i18next.t("general:Email")}</Label>
+        {renderLabel(item.label || i18next.t("general:Email"), item.required, "email")}
         <Input
           id="email"
           className="signup-email-input"
           // not type="email": the browser's own bubble would pre-empt the
           // translated message and skip the signup item's regex
+          autoComplete="email"
           required={item.required}
+          disabled={!!invitation?.email}
           placeholder={item.placeholder}
           value={values.email ?? ""}
           onChange={(e) => set("email", e.target.value)}
@@ -252,7 +360,7 @@ export default function SignupPage() {
       </div>
       {item.rule !== "No verification" ? (
         <div className="signup-email-code space-y-2">
-          <Label>{i18next.t("code:Email code")}</Label>
+          {renderLabel(i18next.t("code:Email code"), item.required)}
           <SendCodeInput
             className="signup-email-code-input"
             value={values.emailCode ?? ""}
@@ -260,6 +368,7 @@ export default function SignupPage() {
             method="signup"
             destType="email"
             dest={values.email ?? ""}
+            disabled={!Setting.isValidEmail(values.email ?? "")}
             application={application}
             applicationId={Setting.getApplicationName(application)}
           />
@@ -271,23 +380,22 @@ export default function SignupPage() {
   const renderPhone = (item: any) => (
     <React.Fragment key={`${item.name}-phone`}>
       <div className="signup-phone space-y-2">
-        <Label htmlFor="phone">{item.label || i18next.t("general:Phone")}</Label>
+        {renderLabel(item.label || i18next.t("general:Phone"), item.required, "phone")}
         <div className="flex gap-2">
-          <div className="w-32 shrink-0">
-            <SearchableSelect
-              value={values.countryCode ?? application.organizationObj?.countryCodes?.[0] ?? ""}
+          <div className="w-28 max-w-[50%] shrink-0">
+            <CountryCodeSelect
+              className="px-2"
+              value={values.countryCode ?? ""}
               onChange={(v) => set("countryCode", v)}
-              options={Setting.getCountryCodeData(application.organizationObj?.countryCodes).map((country: any) => ({
-                value: country.code,
-                label: `+${country.phone}`,
-                keywords: `${country.name} ${country.code} ${country.phone}`,
-              }))}
+              countryCodes={application.organizationObj?.countryCodes}
             />
           </div>
           <Input
             id="phone"
-            className="signup-phone-input"
+            className="signup-phone-input min-w-0 flex-1"
+            autoComplete="tel"
             required={item.required}
+            disabled={!!invitation?.phone}
             placeholder={item.placeholder}
             value={values.phone ?? ""}
             onChange={(e) => set("phone", e.target.value)}
@@ -296,8 +404,8 @@ export default function SignupPage() {
         {fieldError("phone")}
       </div>
       {item.rule !== "No verification" ? (
-        <div className="signup-phone-code space-y-2">
-          <Label>{i18next.t("code:Phone code")}</Label>
+        <div className="phone-code space-y-2">
+          {renderLabel(i18next.t("code:Phone code"), item.required)}
           <SendCodeInput
             className="signup-phone-code-input"
             value={values.phoneCode ?? ""}
@@ -306,6 +414,7 @@ export default function SignupPage() {
             destType="phone"
             dest={values.phone ?? ""}
             countryCode={values.countryCode ?? ""}
+            disabled={!Setting.isValidPhone(values.phone ?? "", values.countryCode ?? "")}
             application={application}
             applicationId={Setting.getApplicationName(application)}
           />
@@ -315,19 +424,48 @@ export default function SignupPage() {
   );
 
   /** A plain text field, used by the items that only differ in their label. */
-  const renderTextItem = (item: any, field: string, defaultLabel: string, type?: string) => (
-    <div key={`${item.name}-${field}`} className={`signup-${field} space-y-2`}>
-      <Label htmlFor={field}>{item.label || defaultLabel}</Label>
+  const renderTextItem = (item: any, field: string, defaultLabel: string, extra?: Record<string, any>) => (
+    <div key={`${item.name}-${field}`} className={`${fieldClass(field)} space-y-2`}>
+      {renderLabel(item.label || defaultLabel, item.required, field)}
       <Input
         id={field}
-        className={`signup-${field}-input`}
-        type={type}
+        className={`${fieldClass(field)}-input`}
         required={item.required}
         placeholder={item.placeholder}
         value={values[field] ?? ""}
         onChange={(e) => set(field, e.target.value)}
+        {...extra}
       />
       {fieldError(field)}
+    </div>
+  );
+
+  const renderPassword = (item: any, field: "password" | "confirm", defaultLabel: string) => (
+    <div key={`${item.name}-${field}`} className={`${fieldClass(field)} space-y-2`}>
+      {renderLabel(item.label || defaultLabel, item.required, field)}
+      <PasswordInput
+        id={field}
+        className={`${fieldClass(field)}-input`}
+        autoComplete="new-password"
+        required={item.required}
+        placeholder={item.placeholder}
+        value={values[field] ?? ""}
+        onChange={(e) => set(field, e.target.value)}
+        onFocus={field === "password" ? () => setPasswordFocused(true) : undefined}
+      />
+      {field === "password" && passwordFocused ? (
+        <PasswordRequirements
+          options={application.organizationObj?.passwordOptions}
+          password={values.password ?? ""}
+        />
+      ) : null}
+      {field === "confirm" && values.confirm && values.confirm !== values.password ? (
+        <p className="text-xs text-destructive">
+          {i18next.t("signup:Your confirmed password is inconsistent with the password!")}
+        </p>
+      ) : (
+        fieldError(field)
+      )}
     </div>
   );
 
@@ -339,7 +477,10 @@ export default function SignupPage() {
 
     switch (item.name) {
     case "Username":
-      return renderTextItem(item, "username", i18next.t("signup:Username"));
+      return renderTextItem(item, "username", i18next.t("signup:Username"), {
+        autoComplete: "username",
+        disabled: !!invitation?.username,
+      });
     case "Display name":
       if (splitDisplayName) {
         return (
@@ -361,26 +502,9 @@ export default function SignupPage() {
     case "Last name":
       return splitDisplayName ? null : renderTextItem(item, "lastName", i18next.t("general:Last name"));
     case "Password":
-      return renderTextItem(item, "password", i18next.t("general:Password"), "password");
+      return renderPassword(item, "password", i18next.t("general:Password"));
     case "Confirm password":
-      return (
-        <div key={item.name} className="signup-confirm space-y-2">
-          <Label htmlFor="confirm">{item.label || i18next.t("general:Confirm")}</Label>
-          <Input
-            id="confirm"
-            type="password"
-            required={item.required}
-            placeholder={item.placeholder}
-            value={values.confirm ?? ""}
-            onChange={(e) => set("confirm", e.target.value)}
-          />
-          {values.confirm && values.confirm !== values.password ? (
-            <p className="text-xs text-destructive">
-              {i18next.t("signup:Your confirmed password is inconsistent with the password!")}
-            </p>
-          ) : null}
-        </div>
-      );
+      return renderPassword(item, "confirm", i18next.t("general:Confirm"));
     case "Email":
       return renderEmail(item);
     case "Phone":
@@ -411,7 +535,7 @@ export default function SignupPage() {
     case "Country/Region":
       return (
         <div key={item.name} className="signup-country-region space-y-2">
-          <Label>{item.label || i18next.t("user:Country/Region")}</Label>
+          {renderLabel(item.label || i18next.t("user:Country/Region"), item.required)}
           <RegionSelect
             className="signup-region-select"
             value={values.region ?? ""}
@@ -425,7 +549,7 @@ export default function SignupPage() {
       const tags = (item.options?.length > 0 ? item.options : application.tags ?? []) as string[];
       return (
         <div key={item.name} className="signup-tag space-y-2">
-          <Label>{item.label || i18next.t("general:Tag")}</Label>
+          {renderLabel(item.label || i18next.t("general:Tag"), item.required)}
           <SearchableSelect
             className="signup-tag-select"
             value={values.tag ?? ""}
@@ -438,16 +562,20 @@ export default function SignupPage() {
       );
     }
     case "Invitation code":
-      return renderTextItem(item, "invitationCode", i18next.t("application:Invitation code"));
+      return renderTextItem(item, "invitationCode", i18next.t("application:Invitation code"), {
+        disabled: invitation !== undefined,
+      });
     case "Agreement":
       // the application's own terms document opens in a dialog, as in the antd page
       if (application.termsOfUse) {
         return (
-          <AgreementCheckbox key={item.name} application={application} checked={agreed} onChange={setAgreed} />
+          <div key={item.name} className="login-agreement">
+            <AgreementCheckbox application={application} checked={agreed} onChange={setAgreed} />
+          </div>
         );
       }
       return (
-        <div key={item.name} className="signup-agreement flex items-start gap-2">
+        <div key={item.name} className="login-agreement flex items-start gap-2">
           <Checkbox id="agreement" checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} />
           <Label htmlFor="agreement" className="text-sm font-normal leading-5">
             {i18next.t("signup:Accept")}{" "}
@@ -468,6 +596,7 @@ export default function SignupPage() {
           application={application}
           method="signup"
           rule={Setting.getProvidersRule(application, item)}
+          onBeforeClick={checkAgreement}
         />
       );
     case "Signup button":
@@ -488,8 +617,8 @@ export default function SignupPage() {
         return renderTextItem(item, field, label);
       }
       return (
-        <div key={item.name} className={`signup-${field} space-y-2`}>
-          <Label htmlFor={field}>{label}</Label>
+        <div key={item.name} className={`${fieldClass(field)} space-y-2`}>
+          {renderLabel(label, item.required, field)}
           {/* an item can be a choice list rather than a text box, as in the antd form */}
           {item.type === "Single Choice" ? (
             <SearchableSelect
@@ -499,7 +628,12 @@ export default function SignupPage() {
               options={options}
             />
           ) : (
-            <MultiSelect value={values[field] ?? []} onChange={(v) => set(field, v)} options={options} />
+            <MultiSelect
+              value={values[field] ?? []}
+              onChange={(v) => set(field, v)}
+              placeholder={item.placeholder}
+              options={options}
+            />
           )}
           {fieldError(field)}
         </div>
@@ -517,15 +651,21 @@ export default function SignupPage() {
   const hasSignupButtonItem = signupItems.some((item: any) => item.name === "Signup button");
 
   return (
-    <AuthLayout application={application} wide>
+    <AuthLayout
+      preview={!!applicationProp}
+      application={application}
+      wide
+      hideLanguages={(languagesItem && !languagesItem.visible) || forcedLanguage !== ""}
+      onLanguageChange={(key) => {
+        setUserLang(key);
+        Setting.setSigninLanguage(key);
+      }}
+    >
       <form className="space-y-4" onSubmit={submit}>
-        {/* each item styles itself; a "Text N" item holds HTML, not CSS */}
-        {signupItems.map((item: any) =>
-          Setting.isCustomFormItem(item) ? null : <CustomStyle key={`css-${item.name}`} css={item.customCss} />,
-        )}
-        <h1 className="text-center text-xl font-semibold">
-          {i18next.t("account:Sign Up")} {application.displayName ? `- ${application.displayName}` : ""}
-        </h1>
+        {/* each item styles itself; a "Text N" item holds the HTML, not the CSS */}
+        {signupItems.map((item: any) => (
+          <CustomStyle key={`css-${item.name}`} css={item.customCss} />
+        ))}
         {items.map(renderItem)}
         {hasSignupButtonItem ? null : (
           <Button type="submit" className="signup-button w-full" loading={loading}>
@@ -547,12 +687,15 @@ export default function SignupPage() {
         ) : null}
         <p className="text-center text-sm text-muted-foreground">
           {i18next.t("signup:Have account?")}{" "}
-          <Link
-            to={Setting.getStoredSigninUrl() || `/login/${application.organization}`}
-            className="signup-link text-foreground underline-offset-4 hover:underline"
-          >
-            {i18next.t("signup:sign in now")}
-          </Link>
+          {signinLink.startsWith("/") ? (
+            <Link to={signinLink} className="signup-link text-foreground underline-offset-4 hover:underline">
+              {i18next.t("signup:sign in now")}
+            </Link>
+          ) : (
+            <a href={signinLink} className="signup-link text-foreground underline-offset-4 hover:underline">
+              {i18next.t("signup:sign in now")}
+            </a>
+          )}
         </p>
       </form>
     </AuthLayout>
