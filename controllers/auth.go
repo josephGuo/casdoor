@@ -486,11 +486,17 @@ func (c *ApiController) GetApplicationLogin() {
 }
 
 func setHttpClient(idProvider idp.IdProvider, provider *object.Provider) {
-	if provider.EnableProxy || isProxyProviderType(provider.Type) {
+	if isTenantUrlProvider(provider) {
+		idProvider.SetHttpClient(util.NewInternetOnlyHttpClient(30 * time.Second))
+	} else if provider.EnableProxy || isProxyProviderType(provider.Type) {
 		idProvider.SetHttpClient(proxy.ProxyHttpClient)
 	} else {
 		idProvider.SetHttpClient(proxy.DefaultHttpClient)
 	}
+}
+
+func isTenantUrlProvider(provider *object.Provider) bool {
+	return provider.Owner != "admin" && provider.Owner != "built-in" && !isProxyProviderType(provider.Type)
 }
 
 func isProxyProviderType(providerType string) bool {
@@ -516,6 +522,16 @@ func isProxyProviderType(providerType string) bool {
 	return false
 }
 
+func (c *ApiController) setMfaRememberCookie(user *object.User, maxAge int) error {
+	token, err := object.GetMfaRememberToken(user, user.MfaRememberDeadline)
+	if err != nil {
+		return err
+	}
+
+	c.Ctx.SetCookie(object.MfaRememberCookieName, token, maxAge, "/", "", c.Ctx.Input.Scheme() == "https", true, "Lax")
+	return nil
+}
+
 func checkMfaEnable(c *ApiController, user *object.User, organization *object.Organization, verificationType string) bool {
 	if object.IsNeedPromptMfa(organization, user) {
 		// The prompt page needs the user to be signed in
@@ -526,9 +542,7 @@ func checkMfaEnable(c *ApiController, user *object.User, organization *object.Or
 	}
 
 	if user.IsMfaEnabled() {
-		currentTime := util.String2Time(util.GetCurrentTime())
-		mfaRememberDeadline := util.String2Time(user.MfaRememberDeadline)
-		if user.MfaRememberDeadline != "" && mfaRememberDeadline.After(currentTime) {
+		if object.IsMfaRemembered(user, c.Ctx.GetCookie(object.MfaRememberCookieName)) {
 			return false
 		}
 		c.setMfaUserSession(user.GetId())
@@ -1006,6 +1020,11 @@ func (c *ApiController) Login() {
 				return
 			}
 
+			if provider.Type == "WeChat" && !idp.IsWechatTicketOfProvider(authForm.Code, provider.Name) {
+				c.ResponseError(c.T("auth:Invalid token"))
+				return
+			}
+
 			// https://github.com/golang/oauth2/issues/123#issuecomment-103715338
 			token, err = idProvider.GetToken(authForm.Code)
 			if err != nil {
@@ -1384,6 +1403,11 @@ func (c *ApiController) Login() {
 					c.ResponseError(err.Error())
 					return
 				}
+				err = c.setMfaRememberCookie(user, mfaRememberInSeconds)
+				if err != nil {
+					c.ResponseError(err.Error())
+					return
+				}
 			}
 			c.SetSession("verificationCodeType", "")
 		} else if authForm.RecoveryCode != "" {
@@ -1576,6 +1600,7 @@ func (c *ApiController) HandleOfficialAccountEvent() {
 	idp.WechatCacheMap[data.Ticket] = idp.WechatCacheMapValue{
 		IsScanned:     true,
 		WechatUnionId: data.FromUserName,
+		ProviderName:  provider.Name,
 	}
 	idp.Lock.Unlock()
 
