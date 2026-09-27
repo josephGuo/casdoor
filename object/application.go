@@ -123,6 +123,7 @@ type Application struct {
 	EnableAutoSignin             bool            `json:"enableAutoSignin"`
 	EnableCodeSignin             bool            `json:"enableCodeSignin"`
 	EnableExclusiveSignin        bool            `json:"enableExclusiveSignin"`
+	MaxSessions                  int             `json:"maxSessions"`
 	EnableSamlCompress           bool            `json:"enableSamlCompress"`
 	EnableSamlC14n10             bool            `json:"enableSamlC14n10"`
 	EnableSamlPostBinding        bool            `json:"enableSamlPostBinding"`
@@ -359,7 +360,7 @@ func GetApplicationByUserId(userId string) (application *Application, err error)
 		return nil, err
 	}
 	if IsAppUser(userId) {
-		application, err = getApplication("admin", name)
+		application, err = getAppUserApplication(name)
 		return
 	}
 
@@ -438,6 +439,8 @@ func UpdateApplication(id string, application *Application, isGlobalAdmin bool, 
 		KeepApplicationCustomHtml(application, oldApplication)
 	}
 
+	application.Owner = owner
+
 	if name == "app-built-in" {
 		application.Name = name
 	}
@@ -493,10 +496,8 @@ func UpdateApplication(id string, application *Application, isGlobalAdmin bool, 
 	return affected != 0, nil
 }
 
-func AddApplication(application *Application) (bool, error) {
-	if application.Owner == "" {
-		application.Owner = "admin"
-	}
+func AddApplication(application *Application, lang string) (bool, error) {
+	application.Owner = "admin"
 	if application.Organization == "" {
 		application.Organization = "built-in"
 	}
@@ -536,7 +537,7 @@ func AddApplication(application *Application) (bool, error) {
 		return false, fmt.Errorf("only applications belonging to built-in organization can be shared")
 	}
 
-	err = checkMultipleCaptchaProviders(application, "en")
+	err = checkMultipleCaptchaProviders(application, lang)
 	if err != nil {
 		return false, err
 	}
@@ -557,7 +558,7 @@ func AddApplication(application *Application) (bool, error) {
 		return false, err
 	}
 
-	err = validateCustomScopes(application.CustomScopes, "en")
+	err = validateCustomScopes(application.CustomScopes, lang)
 	if err != nil {
 		return false, err
 	}

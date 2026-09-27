@@ -20,19 +20,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/faceId"
 	"github.com/casdoor/casdoor/i18n"
-	"github.com/casdoor/casdoor/proxy"
 	"github.com/casdoor/casdoor/util"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/xorm-io/builder"
 	"github.com/xorm-io/core"
+	"github.com/xorm-io/xorm"
 )
 
 const (
@@ -1030,7 +1034,9 @@ func AddUser(user *User, lang string) (bool, error) {
 		return false, errors.New(i18n.Translate(lang, "user:the user's owner and name should not be empty"))
 	}
 
-	if CheckUsernameWithEmail(user.Name, "en") != "" {
+	user.Groups = getOrganizationGroups(user.Owner, user.Groups)
+
+	if CheckUsernameWithEmail(user.Name, lang) != "" {
 		user.Name = util.GetRandomName()
 	}
 
@@ -1631,17 +1637,45 @@ func (user *User) HasFaceIdImage() bool {
 	return false
 }
 
+const maxFaceIdImageSize = 10 << 20
+
+// getFaceIdImage fetches a face image the user set the URL of, so it must not reach the intranet,
+// except for the files uploaded to the "Local File System" storage, which are read from disk
+func getFaceIdImage(imageUrl string) ([]byte, error) {
+	if data, ok := readLocalUploadedFile(imageUrl); ok {
+		return data, nil
+	}
+
+	resp, err := util.NewInternetOnlyHttpClient(30 * time.Second).Get(imageUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(io.LimitReader(resp.Body, maxFaceIdImageSize))
+}
+
+func readLocalUploadedFile(fileUrl string) ([]byte, bool) {
+	urlObj, err := url.Parse(fileUrl)
+	if err != nil {
+		return nil, false
+	}
+
+	filePath := strings.TrimPrefix(urlObj.Path, "/files/")
+	if filePath == urlObj.Path || !filepath.IsLocal(filePath) {
+		return nil, false
+	}
+
+	data, err := os.ReadFile(filepath.Join("files", filePath))
+	return data, err == nil
+}
+
 func (user *User) CheckUserFace(faceIdImage []string, provider *Provider) (bool, error) {
 	faceIdChecker := faceId.GetFaceIdProvider(provider.Type, provider.ClientId, provider.ClientSecret, provider.Endpoint)
-	httpClient := proxy.DefaultHttpClient
 	errList := []error{}
 	for _, userFaceId := range user.FaceIds {
 		if userFaceId.ImageUrl != "" {
-			imgResp, err := httpClient.Get(userFaceId.ImageUrl)
-			if err != nil {
-				continue
-			}
-			imgByte, err := io.ReadAll(imgResp.Body)
+			imgByte, err := getFaceIdImage(userFaceId.ImageUrl)
 			if err != nil {
 				continue
 			}
@@ -1781,12 +1815,26 @@ func UpdateUserBalance(owner string, name string, balance float64, currency stri
 		}
 	}
 
-	// Validate new balance against credit limit
-	if newBalance < balanceCredit {
+	affected, err := incrBalance(ormer.Engine.ID(core.PK{owner, name}), "balance", convertedBalance, balanceCredit, &User{UpdatedTime: util.GetCurrentTime()})
+	if err != nil {
+		return err
+	}
+	if !affected {
 		return fmt.Errorf(i18n.Translate(lang, "general:Insufficient balance: new balance %v would be below credit limit %v"), newBalance, balanceCredit)
 	}
+	return nil
+}
 
-	user.Balance = newBalance
-	_, err = UpdateUser(user.GetId(), user, []string{"balance"}, true)
-	return err
+// incrBalance adds amount to the column in one statement, a spending is only applied while the
+// column stays at or above the credit, so concurrent payments cannot both spend the same balance
+func incrBalance(session *xorm.Session, column string, amount float64, credit float64, bean interface{}) (bool, error) {
+	if amount == 0 {
+		return true, nil
+	}
+	if amount < 0 {
+		session = session.Where(fmt.Sprintf("%s + ? >= ?", column), amount, credit)
+	}
+
+	affected, err := session.Incr(column, amount).Update(bean)
+	return affected != 0, err
 }

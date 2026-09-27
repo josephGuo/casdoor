@@ -144,6 +144,10 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 		}
 	}
 
+	if msg := checkSignupTag(application, authForm.Tag, lang); msg != "" {
+		return msg
+	}
+
 	for _, signupItem := range application.SignupItems {
 		if signupItem.Regex == "" {
 			continue
@@ -165,6 +169,22 @@ func CheckUserSignup(application *Application, organization *Organization, authF
 		}
 	}
 
+	return ""
+}
+
+func checkSignupTag(application *Application, tag string, lang string) string {
+	signupItem := application.getSignupItem("Tag")
+	if tag == "" || signupItem == nil {
+		return ""
+	}
+
+	options := signupItem.Options
+	if len(options) == 0 {
+		options = application.Tags
+	}
+	if !util.InSlice(options, tag) {
+		return fmt.Sprintf(i18n.Translate(lang, "auth:User's tag: %s is not listed in the application's tags"), tag)
+	}
 	return ""
 }
 
@@ -616,7 +636,7 @@ func IsUserOfApplication(user *User, application *Application) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return organization != nil && organization.DefaultApplication == application.Name, nil
+	return organization != nil && organization.DefaultApplication == application.Name && application.Organization == "built-in", nil
 }
 
 func CheckApplicationSignin(application *Application, user *User, clientIp string, lang string) error {
@@ -901,6 +921,20 @@ func checkUserGroups(oldUser, user *User, lang string) string {
 		}
 	}
 	return ""
+}
+
+func getOrganizationGroups(owner string, groups []string) []string {
+	if len(groups) == 0 {
+		return groups
+	}
+
+	res := []string{}
+	for _, group := range groups {
+		if strings.HasPrefix(group, owner+"/") {
+			res = append(res, group)
+		}
+	}
+	return res
 }
 
 func CheckToEnableCaptcha(application *Application, organization, username string, clientIp string) (bool, error) {

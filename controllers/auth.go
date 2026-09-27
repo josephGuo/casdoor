@@ -29,8 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/beego/beego/v2/server/web"
-	"github.com/casdoor/casdoor/captcha"
 	"github.com/casdoor/casdoor/conf"
 	"github.com/casdoor/casdoor/form"
 	"github.com/casdoor/casdoor/i18n"
@@ -170,7 +168,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 
 	// Revoke the tokens of the displaced login before the response is built, otherwise the
 	// token that this login creates below would be revoked too
-	if application.EnableExclusiveSignin {
+	if application.EnableExclusiveSignin && application.MaxSessions <= 1 {
 		_, err = object.ExpireTokenByUserAndApplication(user.Owner, user.Name, application.Name)
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
@@ -347,24 +345,6 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			return
 		}
 
-		if application.EnableExclusiveSignin {
-			sessions, err := object.GetUserAppSessions(user.Owner, user.Name, application.Name)
-			if err != nil {
-				c.ResponseError(err.Error(), nil)
-				return
-			}
-
-			for _, session := range sessions {
-				for _, sid := range session.SessionId {
-					err := web.GlobalSessions.GetProvider().SessionDestroy(context.Background(), sid)
-					if err != nil {
-						c.ResponseError(err.Error(), nil)
-						return
-					}
-				}
-			}
-		}
-
 		sessionId := c.Ctx.Input.CruSession.SessionID(context.Background())
 		sessionInfo := &object.SessionInfo{
 			SessionId:      sessionId,
@@ -383,12 +363,18 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			Application:  application.Name,
 			SessionId:    []string{sessionId},
 			SessionInfos: []*object.SessionInfo{sessionInfo},
-
-			ExclusiveSignin: application.EnableExclusiveSignin,
 		})
 		if err != nil {
 			c.ResponseError(err.Error(), nil)
 			return
+		}
+
+		if application.EnableExclusiveSignin {
+			err = object.EnforceApplicationSessionLimit(user, application.Name, sessionId, application.MaxSessions)
+			if err != nil {
+				c.ResponseError(err.Error(), nil)
+				return
+			}
 		}
 
 		// The policy comes from the user's organization, a shared application must not impose
@@ -402,7 +388,7 @@ func (c *ApiController) HandleLoggedIn(application *object.Application, user *ob
 			}
 		}
 		if organization != nil && organization.EnableExclusiveSignin {
-			err = object.EnforceSingleBrowserSession(user, sessionId, c.Ctx.Request.Host)
+			err = object.EnforceBrowserSessionLimit(user, sessionId, organization.MaxSessions, c.Ctx.Request.Host)
 			if err != nil {
 				c.ResponseError(err.Error(), nil)
 				return
@@ -454,10 +440,12 @@ func (c *ApiController) GetApplicationLogin() {
 			return
 		}
 
-		err = object.CheckCasLogin(application, c.GetAcceptLanguage(), redirectUri)
-		if err != nil {
-			c.ResponseError(err.Error())
-			return
+		if redirectUri != "" {
+			err = object.CheckCasLogin(application, c.GetAcceptLanguage(), redirectUri)
+			if err != nil {
+				c.ResponseError(err.Error())
+				return
+			}
 		}
 	} else if loginType == "device" {
 		deviceAuthCache, ok := object.DeviceAuthMap.Load(userCode)
@@ -532,19 +520,35 @@ func (c *ApiController) setMfaRememberCookie(user *object.User, maxAge int) erro
 	return nil
 }
 
-func checkMfaEnable(c *ApiController, user *object.User, organization *object.Organization, verificationType string) bool {
-	if object.IsNeedPromptMfa(organization, user) {
-		// The prompt page needs the user to be signed in
-		c.renewSessionIdForUser(user.GetId())
-		c.SetSessionUsername(user.GetId())
-		c.ResponseOk(object.RequiredMfa)
+func (c *ApiController) promptMfaSetup(user *object.User, organization *object.Organization) bool {
+	if !object.IsNeedPromptMfa(organization, user) {
+		return false
+	}
+
+	// The prompt page needs the user to be signed in
+	c.renewSessionIdForUser(user.GetId())
+	c.SetSessionUsername(user.GetId())
+	c.ResponseOk(object.RequiredMfa)
+	return true
+}
+
+func (c *ApiController) promptMfaSetupAfterMfa(user *object.User) bool {
+	organization, err := object.GetOrganizationByUser(user)
+	if err != nil {
+		c.ResponseError(err.Error())
 		return true
 	}
 
-	if user.IsMfaEnabled() {
-		if object.IsMfaRemembered(user, c.Ctx.GetCookie(object.MfaRememberCookieName)) {
-			return false
-		}
+	if !c.promptMfaSetup(user, organization) {
+		return false
+	}
+
+	c.setMfaUserSession("")
+	return true
+}
+
+func checkMfaEnable(c *ApiController, user *object.User, organization *object.Organization, verificationType string) bool {
+	if user.IsMfaEnabled() && !object.IsMfaRemembered(user, c.Ctx.GetCookie(object.MfaRememberCookieName)) {
 		c.setMfaUserSession(user.GetId())
 		mfaList := object.GetAllMfaProps(user, true)
 		mfaAllowList := []*object.MfaProps{}
@@ -564,12 +568,12 @@ func checkMfaEnable(c *ApiController, user *object.User, organization *object.Or
 		}
 	}
 
-	return false
+	return c.promptMfaSetup(user, organization)
 }
 
 func getExistUserByBindingRule(providerItem *object.ProviderItem, application *object.Application, userInfo *idp.UserInfo) (user *object.User, err error) {
 	if providerItem.BindingRule == nil {
-		providerItem.BindingRule = &[]string{"Email", "Phone", "Name"}
+		providerItem.BindingRule = &[]string{"Email", "Phone"}
 	}
 	if len(*providerItem.BindingRule) == 0 {
 		return nil, nil
@@ -588,9 +592,9 @@ func getExistUserByBindingRule(providerItem *object.ProviderItem, application *o
 			}
 		}
 
-		// Find existing user with phone number
-		if rule == "Phone" {
-			user, err = object.GetUserByField(application.Organization, "phone", userInfo.Phone)
+		// Find existing user with phone number, only one the provider vouches for, like the email
+		if rule == "Phone" && userInfo.PhoneVerified {
+			user, err = object.GetUserByPhoneAndCountryCode(application.Organization, userInfo.Phone, userInfo.CountryCode)
 			if err != nil {
 				return nil, err
 			}
@@ -853,12 +857,8 @@ func (c *ApiController) Login() {
 					return
 				}
 
-				if captchaProvider.Type != "Default" {
-					authForm.ClientSecret = captchaProvider.ClientSecret
-				}
-
 				var isHuman bool
-				isHuman, err = captcha.VerifyCaptchaByCaptchaType(authForm.CaptchaType, authForm.CaptchaToken, captchaProvider.ClientId, authForm.ClientSecret, captchaProvider.ClientId2)
+				isHuman, err = verifyAuthFormCaptcha(captchaProvider, &authForm)
 				if err != nil {
 					c.ResponseError(err.Error())
 					return
@@ -1419,6 +1419,10 @@ func (c *ApiController) Login() {
 			}
 		} else {
 			c.ResponseError("missing passcode or recovery code")
+			return
+		}
+
+		if c.promptMfaSetupAfterMfa(user) {
 			return
 		}
 
