@@ -703,6 +703,8 @@ func GetMaskedUser(user *User, isAdminOrSelf bool, errs ...error) (*User, error)
 				}
 			}
 		}
+		user.PasswordSalt = ""
+		user.PasswordType = ""
 	}
 
 	if user.ManagedAccounts != nil {
@@ -1500,6 +1502,9 @@ func DeleteGroupForUser(user string, group string) (bool, error) {
 	userObj, err := GetUser(user)
 	if err != nil {
 		return false, err
+	}
+	if userObj == nil {
+		return false, fmt.Errorf(i18n.Translate("en", "general:The user: %s doesn't exist"), user)
 	}
 
 	userObj.Groups = util.DeleteVal(userObj.Groups, group)

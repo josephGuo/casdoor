@@ -24,7 +24,6 @@ import (
 	_ "github.com/beego/beego/v2/server/web/session/redis_cluster"
 	"github.com/casdoor/casdoor/authz"
 	"github.com/casdoor/casdoor/conf"
-	"github.com/casdoor/casdoor/controllers"
 	"github.com/casdoor/casdoor/ldap"
 	"github.com/casdoor/casdoor/object"
 	"github.com/casdoor/casdoor/proxy"
@@ -79,6 +78,7 @@ func main() {
 	object.InitCleanupTokens()
 	object.InitCleanupRecords()
 	object.InitCleanupDeviceAuthMap()
+	object.InitCleanupCasTickets()
 	object.InitSamlAssertionStore()
 	object.InitExpirePermissions()
 
@@ -89,7 +89,6 @@ func main() {
 	}
 
 	util.SafeGoroutine(func() { object.RunSyncUsersJob() })
-	util.SafeGoroutine(func() { controllers.InitCLIDownloader() })
 
 	// web.DelStaticPath("/static")
 	// web.SetStaticPath("/assets", "web/build/assets")

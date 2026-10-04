@@ -238,9 +238,6 @@ func InitAPI() {
 	web.Router("/api/get-all-actions", &controllers.ApiController{}, "GET:GetAllActions")
 	web.Router("/api/get-all-roles", &controllers.ApiController{}, "GET:GetAllRoles")
 
-	web.Router("/api/run-casbin-command", &controllers.ApiController{}, "GET:RunCasbinCommand")
-	web.Router("/api/refresh-engines", &controllers.ApiController{}, "POST:RefreshEngines")
-
 	web.Router("/api/get-sessions", &controllers.ApiController{}, "GET:GetSessions")
 	web.Router("/api/get-session", &controllers.ApiController{}, "GET:GetSingleSession")
 	web.Router("/api/update-session", &controllers.ApiController{}, "POST:UpdateSession")
@@ -329,7 +326,7 @@ func InitAPI() {
 	web.Router("/api/update-syncer", &controllers.ApiController{}, "POST:UpdateSyncer")
 	web.Router("/api/add-syncer", &controllers.ApiController{}, "POST:AddSyncer")
 	web.Router("/api/delete-syncer", &controllers.ApiController{}, "POST:DeleteSyncer")
-	web.Router("/api/run-syncer", &controllers.ApiController{}, "GET:RunSyncer")
+	web.Router("/api/run-syncer", &controllers.ApiController{}, "POST:RunSyncer")
 	web.Router("/api/test-syncer-db", &controllers.ApiController{}, "POST:TestSyncerDb")
 
 	web.Router("/api/get-webhooks", &controllers.ApiController{}, "GET:GetWebhooks")
