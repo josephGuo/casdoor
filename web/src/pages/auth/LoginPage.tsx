@@ -315,6 +315,9 @@ export default function LoginPage({type = "login", application: applicationProp,
   // OIDC prompt=none: sign in with the existing session or send the reason back, never show a page
   const promptNone = !preview && type === "code" &&
     (new URLSearchParams(location.search).get("prompt") ?? "").split(" ").includes("none");
+  // OIDC prompt=login: the user has to enter credentials again, the existing session is not enough
+  const promptLogin = !preview && type === "code" &&
+    (new URLSearchParams(location.search).get("prompt") ?? "").split(" ").includes("login");
 
   // remember where the sign-in started, for the flows that have to come back to it
   React.useEffect(() => {
@@ -442,22 +445,11 @@ export default function LoginPage({type = "login", application: applicationProp,
 
   /** An OAuth error goes back the same way the response would have (RFC 6749 §4.1.2.1). */
   const redirectWithOAuthError = (error: string, description = "") => {
-    const oAuthParams = Util.getOAuthGetParameters();
-    const payload: Record<string, string> = {error, iss: Setting.getOAuthIssuer()};
-    if (oAuthParams.state) {
-      payload.state = oAuthParams.state;
-    }
+    const payload: Record<string, string> = {error};
     if (description) {
       payload.error_description = description;
     }
-    if (oAuthParams.responseMode === "form_post") {
-      Setting.createFormAndSubmit(oAuthParams.redirectUri, payload);
-      return;
-    }
-    const inFragment = oAuthParams.responseMode === "fragment" ||
-      (oAuthParams.responseMode !== "query" && oAuthParams.responseType !== "code");
-    const concatChar = inFragment ? "#" : oAuthParams.redirectUri.includes("?") ? "&" : "?";
-    Setting.goToLink(`${oAuthParams.redirectUri}${concatChar}${new URLSearchParams(payload)}`);
+    Util.sendOAuthResponse(Util.getOAuthGetParameters(), payload);
   };
 
   const postCodeLoginAction = (res: any) => {
@@ -467,6 +459,8 @@ export default function LoginPage({type = "login", application: applicationProp,
     const redirectUrl = `${oAuthParams.redirectUri}${concatChar}code=${encodeURIComponent(
       codeValue,
     )}&state=${encodeURIComponent(oAuthParams.state)}${Setting.getOAuthIssuerParam()}`;
+    // response_mode decides whether the code goes in the query string, the fragment or a POST form
+    const goToRedirectUrl = () => Util.sendOAuthResponse(oAuthParams, {code: codeValue});
 
     if (res.data === Setting.RequiredUpdatePassword) {
       Setting.goToUpdatePassword(application?.name);
@@ -483,7 +477,7 @@ export default function LoginPage({type = "login", application: applicationProp,
           const nextAccount = accountRes.data;
           nextAccount.organization = accountRes.data2;
           if (Setting.isPromptAnswered(nextAccount, application)) {
-            Setting.goToLink(redirectUrl);
+            goToRedirectUrl();
           } else if (promptNone) {
             redirectWithOAuthError("interaction_required");
           } else {
@@ -509,7 +503,7 @@ export default function LoginPage({type = "login", application: applicationProp,
     const searchParams = new URLSearchParams(location.search);
     const isIframePopup = searchParams.get("popup") === "1" && (searchParams.get("popup_type") || "window") === "iframe";
     if (!isIframePopup) {
-      Setting.goToLink(redirectUrl);
+      goToRedirectUrl();
     }
     sendPopupData({type: "loginSuccess", data: {code: codeValue, state: oAuthParams.state}}, oAuthParams.redirectUri);
   };
@@ -517,7 +511,6 @@ export default function LoginPage({type = "login", application: applicationProp,
   const handleLoginResult = (res: any, values: any, authParams: any) => {
     const responseType = values["type"];
     const responseTypes = String(responseType).split(" ");
-    const responseMode = authParams?.responseMode || "query";
 
     if (responseType === "login") {
       Setting.showMessage("success", i18next.t("application:Logged in successfully"));
@@ -528,22 +521,24 @@ export default function LoginPage({type = "login", application: applicationProp,
     } else if (responseType === "code") {
       postCodeLoginAction(res);
     } else if (responseTypes.includes("token") || responseTypes.includes("id_token")) {
-      const amendatoryResponseType = responseType === "token" ? "access_token" : responseType;
-      if (responseMode === "form_post") {
-        Setting.createFormAndSubmit(authParams?.redirectUri, {
-          token: responseTypes.includes("token") ? res.data : null,
-          id_token: responseTypes.includes("id_token") ? res.data3 : null,
-          token_type: "bearer",
-          state: authParams?.state,
-          iss: Setting.getOAuthIssuer(),
-        });
-      } else {
-        Setting.goToLink(
-          `${authParams.redirectUri}#${amendatoryResponseType}=${encodeURIComponent(
-            responseType === "id_token" ? res.data3 : res.data,
-          )}&state=${encodeURIComponent(authParams.state)}&token_type=bearer${Setting.getOAuthIssuerParam()}`,
-        );
+      // implicit and hybrid flows return what response_type asks for: a hybrid flow has the code in
+      // data and the access token in data2, an implicit flow has the access token in data
+      if (res.data?.required === true) {
+        reload().then(() => navigate(`/consent/${application.name}?${window.location.search.substring(1)}`));
+        return;
       }
+      const payload: Record<string, string> = {};
+      if (responseTypes.includes("code")) {
+        payload.code = res.data;
+      }
+      if (responseTypes.includes("token")) {
+        payload.access_token = responseTypes.includes("code") ? res.data2 : res.data;
+        payload.token_type = "Bearer";
+      }
+      if (responseTypes.includes("id_token")) {
+        payload.id_token = res.data3;
+      }
+      Util.sendOAuthResponse(authParams, payload);
     } else if (responseType === "saml") {
       if (res.data2?.method === "POST") {
         setSaml({response: res.data, redirectUrl: res.data2.redirectUrl, relayState: values["relayState"] ?? ""});
@@ -1039,7 +1034,7 @@ export default function LoginPage({type = "login", application: applicationProp,
    */
   const autoSignedIn = React.useRef(false);
   React.useEffect(() => {
-    if (preview || promptNone || account === undefined) {
+    if (preview || promptNone || promptLogin || account === undefined) {
       return;
     }
     if (account === null) {
@@ -1083,7 +1078,7 @@ export default function LoginPage({type = "login", application: applicationProp,
     AuthBackend.login(values, oAuthParams)
       .then((res: any) => {
         if (res.status !== "ok") {
-          redirectWithOAuthError("access_denied", res.msg);
+          redirectWithOAuthError(res.data === "login_required" ? "login_required" : "access_denied", res.msg);
         } else if (res.data?.required === true) {
           redirectWithOAuthError("consent_required");
         } else if (interactiveResultHandlers.has(res.data)) {
@@ -1278,7 +1273,7 @@ export default function LoginPage({type = "login", application: applicationProp,
 
   // Already signed in to this organization: offer the one-click path before the
   // form, which is how an OAuth or device request gets approved.
-  const showSignedInBox = !!account && account.owner === application.organization;
+  const showSignedInBox = !promptLogin && !!account && account.owner === application.organization;
 
   // The whole page can be replaced by the application's own markup.
   if (application.signinHtml) {
