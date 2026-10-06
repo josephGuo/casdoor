@@ -31,6 +31,9 @@
     <a href="https://github.com/casdoor/casdoor/actions/workflows/golangci-lint.yml">
       <img src="https://img.shields.io/github/actions/workflow/status/casdoor/casdoor/golangci-lint.yml?style=flat-square&label=golangci-lint&logo=go&logoColor=white" alt="golangci-lint">
     </a>
+    <a href="https://www.bestpractices.dev/projects/15254">
+      <img src="https://img.shields.io/cii/level/15254?style=flat-square&label=OpenSSF%20Best%20Practices" alt="OpenSSF Best Practices">
+    </a>
     <a href="https://discord.gg/5rPsrAzK7S">
       <img src="https://img.shields.io/discord/1022748306096537660?style=flat-square&logo=discord&label=Discord&color=5865F2" alt="Discord">
     </a>
@@ -161,7 +164,7 @@ Guide: [Try with Docker](https://casdoor.ai/docs/basic/try-with-docker)
 Requires Helm v3 and a running cluster:
 
 ```bash
-helm install casdoor oci://registry-1.docker.io/casbin/casdoor-helm-charts
+helm install casdoor oci://ghcr.io/casdoor/helm-charts/casdoor
 ```
 
 The chart does not expose Casdoor outside the cluster by default. To reach it, find the service and forward a port:
