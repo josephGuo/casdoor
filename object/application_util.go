@@ -339,6 +339,7 @@ func GetMaskedApplication(application *Application, userId string) *Application 
 	application.TokenFields = []string{}
 	application.TokenSigningMethod = "***"
 	application.TokenAttributes = []*JwtItem{}
+	application.FederatedCredentials = []*FederatedCredential{}
 	application.TokenGroupFormat = "***"
 	application.ExpireInHours = -1
 	application.RefreshExpireInHours = -1
@@ -443,9 +444,19 @@ func GetAllowedApplications(applications []*Application, userId string, lang str
 }
 
 func checkMultipleCaptchaProviders(application *Application, lang string) error {
+	// API clients may send the provider items without the providers themselves
+	m, err := getProviderMap(application.Organization)
+	if err != nil {
+		return err
+	}
+
 	var captchaProviders []string
 	for _, providerItem := range application.Providers {
-		if providerItem.Provider != nil && providerItem.Provider.Category == "Captcha" {
+		provider := providerItem.Provider
+		if provider == nil {
+			provider = m[providerItem.Name]
+		}
+		if provider != nil && provider.Category == "Captcha" {
 			captchaProviders = append(captchaProviders, providerItem.Name)
 		}
 	}
@@ -666,7 +677,7 @@ func (application *Application) IsMagicLinkEnabled() bool {
 // IsMagicLinkSignupEnabled tells whether a link may also create the account, the
 // application has to allow the signup itself as well.
 func (application *Application) IsMagicLinkSignupEnabled() bool {
-	if !application.EnableSignUp {
+	if !application.IsSelfSignupEnabled() {
 		return false
 	}
 
@@ -677,6 +688,14 @@ func (application *Application) IsMagicLinkSignupEnabled() bool {
 	}
 
 	return false
+}
+
+// IsSelfSignupEnabled tells whether users may sign themselves up on the signup page, by a
+// magic link or by a verification code. "Disable self signup" leaves only the signups of
+// the application's providers (e.g. the first SSO login of a new employee) and of the
+// invitation codes an admin hands out
+func (application *Application) IsSelfSignupEnabled() bool {
+	return application.EnableSignUp && !application.DisableSelfSignup
 }
 
 func (application *Application) IsSignupAllowedFor(organization string) bool {

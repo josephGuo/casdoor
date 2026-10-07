@@ -37,7 +37,7 @@ const SIMPLE_TEXT_ITEMS: Record<string, string> = {
   "ID card": "user:ID card",
   "Real name": "application:Real name",
   "Bio": "user:Bio",
-  "Tag": "user:Tag",
+  "Tag": "general:Tag",
   "Education": "user:Education",
   "Gender": "user:Gender",
   "First name": "general:First name",
@@ -192,7 +192,8 @@ export default function SignupPage({application: applicationProp}: {application?
 
   const signinLink = Setting.getStoredSigninUrl() || Setting.getLoginLink(application) || "/login";
 
-  if (!application.enableSignUp) {
+  // without self signup, only an invitation link opens the signup form
+  if (!application.enableSignUp || (application.disableSelfSignup && !values.invitationCode)) {
     return (
       <AuthLayout preview={!!applicationProp} application={application}>
         <div className="space-y-4">

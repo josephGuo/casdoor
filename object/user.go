@@ -837,6 +837,16 @@ var userProviderColumns = []string{
 	"yammer", "yandex", "zoom", "oidc", "custom",
 }
 
+func GetDefaultUserUpdateColumns(isAdmin bool) []string {
+	columns := append([]string{}, userSelfColumns...)
+	if isAdmin {
+		columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "balance_credit", "balance_currency", "mfa_items", "register_type", "register_source",
+			"is_admin", "is_forbidden", "is_deleted", "uid_number", "email_verified")
+		columns = append(columns, userProviderColumns...)
+	}
+	return columns
+}
+
 func FilterUserSelfColumns(columns []string) []string {
 	res := []string{}
 	for _, column := range columns {
@@ -902,13 +912,7 @@ func UpdateUser(id string, user *User, columns []string, isAdmin bool) (bool, er
 	}
 
 	if len(columns) == 0 {
-		columns = append([]string{}, userSelfColumns...)
-
-		if isAdmin {
-			columns = append(columns, "name", "id", "email", "phone", "country_code", "type", "balance", "balance_credit", "balance_currency", "mfa_items", "register_type", "register_source",
-				"is_admin", "is_forbidden", "is_deleted", "uid_number", "email_verified")
-			columns = append(columns, userProviderColumns...)
-		}
+		columns = GetDefaultUserUpdateColumns(isAdmin)
 	}
 
 	columns = append(columns, "updated_time")
@@ -1057,7 +1061,7 @@ func AddUser(user *User, lang string) (bool, error) {
 			return false, err
 		}
 		if applicationCount == 0 {
-			return false, fmt.Errorf(i18n.Translate(lang, "general:The organization: %s should have one application at least"), organization.Owner)
+			return false, fmt.Errorf(i18n.Translate(lang, "general:The organization: %s should have one application at least"), organization.Name)
 		}
 	}
 
@@ -1326,12 +1330,20 @@ func DeleteUser(user *User) (bool, error) {
 		return false, err
 	}
 	if organization != nil && organization.EnableSoftDeletion {
-		user.IsDeleted = true
-		user.DeletedTime = util.GetCurrentTime()
-		return UpdateUser(user.GetId(), user, []string{"is_deleted", "deleted_time"}, false)
-	} else {
-		return deleteUser(user)
+		oldUser, err := getUser(user.Owner, user.Name)
+		if err != nil {
+			return false, err
+		}
+
+		// Deleting a user that is already soft-deleted removes it permanently
+		if oldUser != nil && !oldUser.IsDeleted {
+			user.IsDeleted = true
+			user.DeletedTime = util.GetCurrentTime()
+			return UpdateUser(user.GetId(), user, []string{"is_deleted", "deleted_time"}, false)
+		}
 	}
+
+	return deleteUser(user)
 }
 
 func GetUserInfo(user *User, scope string, aud string, host string) (*Userinfo, error) {
@@ -1589,6 +1601,11 @@ func userChangeTrigger(owner string, oldName string, newName string) error {
 	}
 
 	_, err = session.Where(fmt.Sprintf("owner = ? AND %s = ?", quoteColumn("user")), owner, oldName).Cols("user").Update(&Resource{User: newName})
+	if err != nil {
+		return err
+	}
+
+	_, err = session.Where(fmt.Sprintf("organization = ? AND %s = ?", quoteColumn("user")), owner, oldName).Cols("user").Update(&Token{User: newName})
 	if err != nil {
 		return err
 	}
