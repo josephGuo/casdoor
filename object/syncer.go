@@ -17,6 +17,7 @@ package object
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/casdoor/casdoor/i18n"
 	"github.com/casdoor/casdoor/util"
@@ -332,9 +333,21 @@ func (syncer *Syncer) getTargetTablePrimaryKey() string {
 	return column.Name
 }
 
+var errSyncerRunning = errors.New("the syncer is already running")
+
+var syncerLocks sync.Map
+
 func RunSyncer(syncer *Syncer) error {
+	value, _ := syncerLocks.LoadOrStore(syncer.GetId(), &sync.Mutex{})
+	lock := value.(*sync.Mutex)
+	if !lock.TryLock() {
+		return errSyncerRunning
+	}
+	defer lock.Unlock()
+
 	err := syncer.initAdapter()
 	if err != nil {
+		_ = syncer.Close()
 		return err
 	}
 
@@ -342,6 +355,7 @@ func RunSyncer(syncer *Syncer) error {
 	err = syncer.syncGroups()
 	if err != nil {
 		// Log error but don't fail the entire sync
+		recordSyncerError(syncer, err)
 		fmt.Printf("Warning: syncGroups() error: %s\n", err.Error())
 	}
 
