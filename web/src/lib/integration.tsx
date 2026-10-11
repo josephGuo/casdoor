@@ -1,8 +1,10 @@
 import * as React from "react";
 import i18next from "i18next";
 
-/** The public Marketplace site, where every integration has a page with its full guide. */
-export const MarketplaceSiteUrl = "https://marketplace.casdoor.cn";
+/** The public Marketplace site, where every integration has a page with its full guide: Chinese pages on the .cn host, English ones on the .com host. */
+export function getMarketplaceSiteUrl(): string {
+  return i18next.language?.startsWith("zh") ? "https://marketplace.casdoor.cn/zh" : "https://marketplace.casdoor.com";
+}
 
 export const IntegrationTypes = ["app", "provider", "theme"] as const;
 
@@ -36,6 +38,35 @@ export function getLocalized(text: Record<string, string> | string | undefined |
 export function fillVariables(text: string, values: Record<string, string>): string {
   return text.replace(/\{\{\s*([a-zA-Z][a-zA-Z0-9]*)\s*\}\}/g, (match, name) => values[name] || match);
 }
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&#34;").replace(/'/g, "&#39;");
+}
+
+/**
+ * A copy of the application with a theme applied the way the backend installs it: the theme
+ * fields are replaced, and values going into HTML fields are escaped.
+ */
+export function applyTheme(application: any, theme: any, values: Record<string, string>): any {
+  const fill = (text: string | undefined, escape: boolean) =>
+    (text ?? "").replace(/\{\{\s*([a-zA-Z][a-zA-Z0-9]*)\s*\}\}/g, (match, name) => {
+      const value = values[name] ?? "";
+      return escape ? escapeHtml(value) : value;
+    });
+  return {
+    ...application,
+    themeData: theme.themeData ? {...theme.themeData, colorPrimary: fill(theme.themeData.colorPrimary, false)} : null,
+    formOffset: theme.formOffset ?? 2,
+    formCss: fill(theme.formCss, false),
+    formCssMobile: fill(theme.formCssMobile, false),
+    formSideHtml: fill(theme.formSideHtml, true),
+    footerHtml: fill(theme.footerHtml, true),
+    formBackgroundUrl: fill(theme.formBackgroundUrl, false),
+    formBackgroundUrlMobile: fill(theme.formBackgroundUrlMobile, false),
+  };
+}
+
+export const ThemePreviewMessage = "casdoor-theme-preview";
 
 /** Guide texts use `code` and **bold**. */
 export function renderInlineText(text: string): React.ReactNode[] {
