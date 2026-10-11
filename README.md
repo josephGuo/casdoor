@@ -49,7 +49,7 @@
 </div>
 
 <div align="center">
-  <a href="https://door.casdoor.net">
+  <a href="https://door.casdoor.com">
     <img src="https://cdn.casbin.org/img/casdoor-signin.png" alt="Casdoor sign-in page with password, code, WebAuthn and Face ID tabs and social login icons" width="900">
   </a>
   <p><sub>The sign-in page your users see: password, email/SMS code, WebAuthn and Face ID, plus every social provider you enable.</sub></p>
@@ -58,15 +58,15 @@
 <table>
   <tr>
     <td width="33%" valign="top" align="center">
-      <a href="https://door.casdoor.net"><img src="https://cdn.casbin.org/img/casdoor-console.png" alt="Casdoor admin console dashboard with user, application and provider statistics"></a>
+      <a href="https://door.casdoor.com"><img src="https://cdn.casbin.org/img/casdoor-console.png" alt="Casdoor admin console dashboard with user, application and provider statistics"></a>
       <sub><b>Admin console.</b> Users, tokens, organizations and providers at a glance.</sub>
     </td>
     <td width="33%" valign="top" align="center">
-      <a href="https://door.casdoor.net/applications"><img src="https://cdn.casbin.org/img/casdoor-applications.png" alt="Casdoor applications list showing several applications with their organizations and providers"></a>
+      <a href="https://door.casdoor.com/applications"><img src="https://cdn.casbin.org/img/casdoor-applications.png" alt="Casdoor applications list showing several applications with their organizations and providers"></a>
       <sub><b>Applications.</b> Every app that delegates login to Casdoor, across all organizations.</sub>
     </td>
     <td width="33%" valign="top" align="center">
-      <a href="https://door.casdoor.net/applications/admin/app-built-in"><img src="https://cdn.casbin.org/img/casdoor-application-providers.png" alt="Casdoor application settings, Providers tab, with per-provider signup, signin and unlink toggles"></a>
+      <a href="https://door.casdoor.com/applications/admin/app-built-in"><img src="https://cdn.casbin.org/img/casdoor-application-providers.png" alt="Casdoor application settings, Providers tab, with per-provider signup, signin and unlink toggles"></a>
       <sub><b>Application settings.</b> OAuth, SAML, providers and branding — no redeploy, no config file.</sub>
     </td>
   </tr>
@@ -110,11 +110,11 @@ Prefer not to install anything? Use the hosted demos:
 | Demo | URL | Notes |
 |------|-----|-------|
 | **Writable** | [demo.casdoor.com](https://demo.casdoor.com) | Full access, so you can click through everything. **All data resets about every 5 minutes.** |
-| **Read-only** | [door.casdoor.net](https://door.casdoor.net) | Stable global demo. **Every write operation fails by design.** |
+| **Read-only** | [door.casdoor.com](https://door.casdoor.com) | Stable global demo. **Every write operation fails by design.** |
 
 Both accept the same `built-in` / `admin` / `123` credentials.
 
-Want it hosted for production instead? [Casdoor Cloud](https://www.casdoor.com/pricing?utm_source=github&utm_medium=readme&utm_content=try) runs a dedicated Casdoor instance and database for you, kept up to date by the Casdoor team. It is the same open-source Casdoor, so you can move between Cloud and self-hosting at any time.
+Want it hosted for production instead? [Casdoor Cloud](https://www.casdoor.com/pricing?utm_source=github&utm_medium=readme&utm_content=try) runs a dedicated Casdoor instance and database for you, kept up to date by the Casdoor team. It is the same open-source Casdoor, so you can move between Cloud and self-hosting at any time. New accounts get $20 in free credit to try it, so you can [start a free trial](https://admin.casdoor.com/signup?from=%2Finstances%2Fnew%3Ftier%3Dbasic%26period%3DPostPaid) without talking to anyone.
 
 ## 🤔 Why Casdoor
 
@@ -127,9 +127,13 @@ Casdoor is a **complete identity provider**, not an authentication proxy and not
 
 If all you need is a login screen in front of an existing reverse proxy, a smaller tool may suit you better. Casdoor is for when you want to own the user directory itself.
 
+Coming from another product? See how Casdoor compares with [Keycloak](https://www.casdoor.com/compare/keycloak?utm_source=github&utm_medium=readme&utm_content=why), [Auth0](https://www.casdoor.com/compare/auth0?utm_source=github&utm_medium=readme&utm_content=why), [Okta](https://www.casdoor.com/compare/okta?utm_source=github&utm_medium=readme&utm_content=why) and [others](https://www.casdoor.com/compare?utm_source=github&utm_medium=readme&utm_content=why).
+
 ## 📦 Installation
 
 Four supported paths, fastest first. All of them end up at <http://localhost:8000>.
+
+> Rather not run the server, database and upgrades yourself? [Casdoor Cloud](https://www.casdoor.com/pricing?utm_source=github&utm_medium=readme&utm_content=install) gives you a dedicated Casdoor instance in the region you choose, with flat monthly pricing and no per-user fees.
 
 ### Docker — all-in-one (evaluation)
 
@@ -256,7 +260,7 @@ At this point you have a running identity provider with nothing connected to it 
 
 - **REST API** — every console action is also an API call
 - **SDKs** — Go, Java, Python, Node.js, .NET, PHP, Rust and more
-- **Swagger UI** — [live API explorer](https://door.casdoor.net/swagger)
+- **Swagger UI** — [live API explorer](https://door.casdoor.com/swagger)
 - **Webhooks** — push user and sign-in events into your own systems
 - **Customizable UI** — theme the login page and console per organization
 
@@ -277,7 +281,7 @@ The full documentation lives at **[casdoor.ai/docs](https://casdoor.ai/docs/over
 |------------|-------|
 | Install Casdoor | [From source](https://casdoor.ai/docs/basic/server-installation) &middot; [Docker](https://casdoor.ai/docs/basic/try-with-docker) &middot; [Helm](https://casdoor.ai/docs/basic/try-with-helm) |
 | Connect my application | [How to connect to Casdoor](https://casdoor.ai/docs/how-to-connect/overview) |
-| Use the API | [Public API](https://casdoor.ai/docs/basic/public-api) &middot; [Swagger UI](https://door.casdoor.net/swagger) |
+| Use the API | [Public API](https://casdoor.ai/docs/basic/public-api) &middot; [Swagger UI](https://door.casdoor.com/swagger) |
 | Choose an SDK | [Integrations](https://casdoor.ai/docs/category/integrations) |
 | Deploy to production | [Deployment](https://casdoor.ai/docs/category/deployment) |
 | Upgrade from v3 to v4 | [Upgrading from v3 to v4](https://casdoor.ai/docs/deployment/upgrade-v3-to-v4) |
@@ -314,6 +318,7 @@ Before exposing a Casdoor instance to the internet:
 - **GitHub Discussions** — [ask and search here](https://github.com/casdoor/casdoor/discussions)
 - **GitHub Issues** — [bug reports and feature requests](https://github.com/casdoor/casdoor/issues)
 - **Commercial support** — [casdoor.ai/help](https://casdoor.ai/help)
+- **Managed hosting** — [Casdoor Cloud](https://www.casdoor.com/?utm_source=github&utm_medium=readme&utm_content=support) runs and upgrades Casdoor for you
 
 ## 🌍 Contributing
 
@@ -325,7 +330,7 @@ Read the [contribution guidelines](https://casdoor.ai/docs/contributing/) before
 
 ## 🙌 Support Casdoor
 
-Casdoor is free and open source. If it saves you time, consider supporting its development on [Open Collective](https://opencollective.com/casdoor).
+Casdoor is free and open source. If it saves you time, consider supporting its development on [Open Collective](https://opencollective.com/casdoor). Choosing [Casdoor Cloud](https://www.casdoor.com/?utm_source=github&utm_medium=readme&utm_content=sponsor) for hosting also funds the project directly.
 
 <a href="https://opencollective.com/casdoor#sponsor"><img src="https://opencollective.com/casdoor/tiers/sponsor.svg?avatarHeight=74" alt="Sponsors on Open Collective"></a>
 
