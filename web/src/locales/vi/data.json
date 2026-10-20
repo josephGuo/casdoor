@@ -156,6 +156,8 @@
     "Rule": "Quy tắc",
     "SAML C14N10 prefix": "Tiền tố SAML C14N10",
     "SAML C14N10 prefix - Tooltip": "Tiền tố không gian tên XML được sử dụng trong chuẩn hóa SAML C14N10 (ví dụ: 'ds' cho chữ ký số XML)",
+    "SAML NameID template": "Mẫu NameID SAML",
+    "SAML NameID template - Tooltip": "Giá trị NameID tùy chỉnh. Biến: $user.name, $user.email, $user.emailLocalPart (trước @), $user.emailDomain (sau @), $user.id, $user.phone, $user.owner. Ví dụ $user.emailLocalPart.$user.emailDomain@tenant.com biến user@example.com thành user.example.com@tenant.com. Để trống sẽ dùng tên người dùng, hoặc email nếu bật \"Sử dụng Email làm NameID\"",
     "SAML hash algorithm": "Thuật toán hash SAML",
     "SAML hash algorithm - Tooltip": "Thuật toán hash cho chữ ký SAML - Gợi ý",
     "SAML metadata": "SAML metadata: Siêu dữ liệu SAML",
@@ -492,6 +494,7 @@
     "GID number - Tooltip": "GID number - Tooltip",
     "General": "Chung",
     "Generate": "Tạo",
+    "Global Settings": "Cài đặt toàn cục",
     "Go to enable": "Đi để bật",
     "Go to writable demo site?": "Bạn có muốn đi đến trang demo có thể viết được không?",
     "Groups": "Nhóm",
@@ -787,11 +790,15 @@
     "Update available": "Có bản cập nhật"
   },
   "invitation": {
+    "1 day": "1 ngày",
+    "30 days": "30 ngày",
+    "7 days": "7 ngày",
     "Code": "Mã",
     "Code - Tooltip": "Mã",
     "Default code": "Mã mặc định",
     "Default code - Tooltip": "Khi mã mời là biểu thức chính quy, vui lòng nhập mã mời khớp quy tắc biểu thức chính quy làm mã mời mặc định cho liên kết mời",
     "Edit Invitation": "Chỉnh sửa lời mời",
+    "Never": "Không bao giờ",
     "New Invitation": "Lời mời mới",
     "Quota": "Hạn ngạch",
     "Quota - Tooltip": "Hạn ngạch",
@@ -1474,6 +1481,15 @@
     "Production endpoint is empty": "Điểm cuối production trống",
     "Scan server": "Máy chủ quét",
     "Scanned hosts": "Máy chủ đã quét"
+  },
+  "setting": {
+    "Cannot be more than the max open connections": "Không được lớn hơn số kết nối mở tối đa",
+    "Connection max lifetime": "Thời gian sống tối đa của kết nối",
+    "Connection max lifetime - Tooltip": "Thời gian tối đa một kết nối được dùng lại trước khi đóng, 0 nghĩa là không giới hạn",
+    "Max idle connections": "Số kết nối nhàn rỗi tối đa",
+    "Max idle connections - Tooltip": "Số kết nối nhàn rỗi tối đa giữ trong pool, 0 nghĩa là mặc định 2",
+    "Max open connections": "Số kết nối mở tối đa",
+    "Max open connections - Tooltip": "Số kết nối tối đa được mở tới cơ sở dữ liệu, 0 nghĩa là không giới hạn"
   },
   "signup": {
     "Accept": "Chấp nhận",

@@ -156,6 +156,8 @@
     "Rule": "Règle",
     "SAML C14N10 prefix": "Préfixe SAML C14N10",
     "SAML C14N10 prefix - Tooltip": "Préfixe d'espace de noms XML utilisé dans la canonicalisation SAML C14N10 (p. ex. 'ds' pour les signatures numériques XML)",
+    "SAML NameID template": "Modèle de NameID SAML",
+    "SAML NameID template - Tooltip": "Valeur NameID personnalisée. Variables : $user.name, $user.email, $user.emailLocalPart (avant @), $user.emailDomain (après @), $user.id, $user.phone, $user.owner. Par exemple, $user.emailLocalPart.$user.emailDomain@tenant.com transforme user@example.com en user.example.com@tenant.com. Vide : nom d'utilisateur, ou e-mail si « Utiliser l'e-mail comme NameID » est activé",
     "SAML hash algorithm": "Algorithme de hachage SAML",
     "SAML hash algorithm - Tooltip": "Algorithme de hachage pour la signature SAML - Info-bulle",
     "SAML metadata": "Métadonnées SAML",
@@ -492,6 +494,7 @@
     "GID number - Tooltip": "GID number - Tooltip",
     "General": "Général",
     "Generate": "Générer",
+    "Global Settings": "Paramètres globaux",
     "Go to enable": "Aller activer",
     "Go to writable demo site?": "Allez sur le site de démonstration modifiable ?",
     "Groups": "Groupes",
@@ -787,11 +790,15 @@
     "Update available": "Mise à jour disponible"
   },
   "invitation": {
+    "1 day": "1 jour",
+    "30 days": "30 jours",
+    "7 days": "7 jours",
     "Code": "Code d'invitation",
     "Code - Tooltip": "Code",
     "Default code": "Code par défaut",
     "Default code - Tooltip": "Lorsque le code d'invitation est une expression régulière, veuillez entrer le code d'invitation correspondant à la règle regex comme code d'invitation par défaut pour le lien d'invitation",
     "Edit Invitation": "Modifier l'invitation",
+    "Never": "Jamais",
     "New Invitation": "Nouvelle invitation",
     "Quota": "Quota d'invitation",
     "Quota - Tooltip": "Quota",
@@ -1474,6 +1481,15 @@
     "Production endpoint is empty": "L'endpoint de production est vide",
     "Scan server": "Scanner le serveur",
     "Scanned hosts": "Hôtes scannés"
+  },
+  "setting": {
+    "Cannot be more than the max open connections": "Ne peut pas dépasser le nombre max. de connexions ouvertes",
+    "Connection max lifetime": "Durée de vie max. d'une connexion",
+    "Connection max lifetime - Tooltip": "Durée maximale de réutilisation d'une connexion avant sa fermeture, 0 signifie sans limite",
+    "Max idle connections": "Connexions inactives max.",
+    "Max idle connections - Tooltip": "Nombre maximal de connexions inactives conservées dans le pool, 0 signifie la valeur par défaut de 2",
+    "Max open connections": "Connexions ouvertes max.",
+    "Max open connections - Tooltip": "Nombre maximal de connexions ouvertes à la base de données, 0 signifie illimité"
   },
   "signup": {
     "Accept": "Accepter",

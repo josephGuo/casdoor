@@ -156,6 +156,8 @@
     "Rule": "Kural",
     "SAML C14N10 prefix": "SAML C14N10 ön eki",
     "SAML C14N10 prefix - Tooltip": "SAML C14N10 kanonizasyonunda kullanılan XML ad alanı ön eki (ör. XML dijital imzaları için 'ds')",
+    "SAML NameID template": "SAML NameID şablonu",
+    "SAML NameID template - Tooltip": "Özel NameID değeri. Yer tutucular: $user.name, $user.email, $user.emailLocalPart (@ öncesi), $user.emailDomain (@ sonrası), $user.id, $user.phone, $user.owner. Örn. $user.emailLocalPart.$user.emailDomain@tenant.com, user@example.com adresini user.example.com@tenant.com yapar. Boşsa kullanıcı adı, \"NameID olarak E-posta kullan\" açıksa e-posta kullanılır",
     "SAML hash algorithm": "SAML karma algoritması",
     "SAML hash algorithm - Tooltip": "SAML imzası için karma algoritması",
     "SAML metadata": "SAML meta verileri",
@@ -492,6 +494,7 @@
     "GID number - Tooltip": "GID number - Tooltip",
     "General": "Genel",
     "Generate": "Oluştur",
+    "Global Settings": "Genel ayarlar",
     "Go to enable": "Etkinleştirmek için git",
     "Go to writable demo site?": "Yazılabilir demo sitesine gitmek ister misiniz?",
     "Groups": "Gruplar",
@@ -787,11 +790,15 @@
     "Update available": "Güncelleme var"
   },
   "invitation": {
+    "1 day": "1 gün",
+    "30 days": "30 gün",
+    "7 days": "7 gün",
     "Code": "Kod",
     "Code - Tooltip": "Kod",
     "Default code": "Varsayılan kod",
     "Default code - Tooltip": "Davet kodu bir düzenli ifade ise, lütfen düzenli ifade kuralına uyan davet kodunu varsayılan davet bağlantısı için davet kodu olarak girin",
     "Edit Invitation": "Daveti Düzenle",
+    "Never": "Asla",
     "New Invitation": "Yeni Davet",
     "Quota": "Kota",
     "Quota - Tooltip": "Kota",
@@ -1474,6 +1481,15 @@
     "Production endpoint is empty": "Üretim uç noktası boş",
     "Scan server": "Tarama sunucusu",
     "Scanned hosts": "Taranan hostlar"
+  },
+  "setting": {
+    "Cannot be more than the max open connections": "Maks. açık bağlantı sayısından fazla olamaz",
+    "Connection max lifetime": "Bağlantı maks. ömrü",
+    "Connection max lifetime - Tooltip": "Bir bağlantının kapatılmadan önce yeniden kullanılabileceği en uzun süre, 0 sınırsız demektir",
+    "Max idle connections": "Maks. boşta bağlantı",
+    "Max idle connections - Tooltip": "Havuzda tutulan en fazla boşta bağlantı sayısı, 0 varsayılan değer olan 2 demektir",
+    "Max open connections": "Maks. açık bağlantı",
+    "Max open connections - Tooltip": "Veritabanına açık olabilecek en fazla bağlantı sayısı, 0 sınırsız demektir"
   },
   "signup": {
     "Accept": "Kabul Et",

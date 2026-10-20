@@ -156,6 +156,8 @@
     "Rule": "Regra",
     "SAML C14N10 prefix": "Prefixo SAML C14N10",
     "SAML C14N10 prefix - Tooltip": "Prefixo de namespace XML usado na canonicalização SAML C14N10 (ex.: 'ds' para assinaturas digitais XML)",
+    "SAML NameID template": "Modelo de NameID SAML",
+    "SAML NameID template - Tooltip": "Valor de NameID personalizado. Marcadores: $user.name, $user.email, $user.emailLocalPart (antes do @), $user.emailDomain (depois do @), $user.id, $user.phone, $user.owner. Ex.: $user.emailLocalPart.$user.emailDomain@tenant.com transforma user@example.com em user.example.com@tenant.com. Vazio usa o nome de usuário, ou o e-mail se \"Usar e-mail como NameID\" estiver ativado",
     "SAML hash algorithm": "Algoritmo de hash SAML",
     "SAML hash algorithm - Tooltip": "Algoritmo de hash para assinatura SAML",
     "SAML metadata": "Metadados do SAML",
@@ -492,6 +494,7 @@
     "GID number - Tooltip": "GID number - Tooltip",
     "General": "Geral",
     "Generate": "Gerar",
+    "Global Settings": "Configurações globais",
     "Go to enable": "Ir para ativar",
     "Go to writable demo site?": "Acessar o site de demonstração gravável?",
     "Groups": "Grupos",
@@ -787,11 +790,15 @@
     "Update available": "Atualização disponível"
   },
   "invitation": {
+    "1 day": "1 dia",
+    "30 days": "30 dias",
+    "7 days": "7 dias",
     "Code": "Código",
     "Code - Tooltip": "Código",
     "Default code": "Código padrão",
     "Default code - Tooltip": "Quando o código de convite for uma expressão regular, digite o código de convite que corresponde à regra como código de convite padrão para o link de convite",
     "Edit Invitation": "Editar Convite",
+    "Never": "Nunca",
     "New Invitation": "Novo Convite",
     "Quota": "Cota",
     "Quota - Tooltip": "Cota",
@@ -1474,6 +1481,15 @@
     "Production endpoint is empty": "O ponto de extremidade de produção está vazio",
     "Scan server": "Servidor de varredura",
     "Scanned hosts": "Hosts verificados"
+  },
+  "setting": {
+    "Cannot be more than the max open connections": "Não pode ser maior que o máx. de conexões abertas",
+    "Connection max lifetime": "Tempo máximo de vida da conexão",
+    "Connection max lifetime - Tooltip": "Tempo máximo que uma conexão é reutilizada antes de ser fechada, 0 significa sem limite",
+    "Max idle connections": "Máx. de conexões ociosas",
+    "Max idle connections - Tooltip": "Número máximo de conexões ociosas mantidas no pool, 0 significa o padrão de 2",
+    "Max open connections": "Máx. de conexões abertas",
+    "Max open connections - Tooltip": "Número máximo de conexões abertas com o banco de dados, 0 significa ilimitado"
   },
   "signup": {
     "Accept": "Aceitar",
