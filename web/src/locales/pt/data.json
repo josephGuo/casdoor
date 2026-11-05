@@ -624,6 +624,7 @@
     "Provider - Tooltip": "Provedores de pagamento a serem configurados, incluindo PayPal, Alipay, WeChat Pay, etc.",
     "QR Code": "Código QR",
     "QR code is too large": "Código QR muito grande",
+    "RADIUS Clients": "Clientes RADIUS",
     "Records": "Registros",
     "Refresh": "Atualizar",
     "Request": "Requisição",
@@ -767,7 +768,12 @@
     "Total users": "Total de usuários"
   },
   "integration": {
+    "Action client secret help": "A chave secreta fornecida pelo serviço de pagamento. Você também pode preenchê-la depois na página do provedor.",
+    "Action install summary": "Adiciona um provedor de pagamento {name}. O código dele roda dentro do Casdoor em uma sandbox e só pode enviar requisições aos hosts permitidos.",
+    "Action installed description": "Este provedor de pagamento executa a ação. Preencha as chaves na página do provedor e depois adicione-o aos provedores de pagamento de um produto.",
     "Add to application help": "Opcional: adicionar também o provedor à página de login deste aplicativo.",
+    "Allowed hosts": "Hosts permitidos",
+    "Allowed hosts help": "Os únicos destinos para os quais a ação pode enviar requisições. Ela não pode ler arquivos, o banco de dados nem nada mais do Casdoor.",
     "App": "Aplicativo",
     "App install summary": "Cria um aplicativo com as URLs de redirecionamento de que {name} precisa. Depois, o guia de configuração mostra o resto com os seus valores.",
     "App installed description": "Este aplicativo foi criado para a integração. Conclua a configuração no lado do app com os passos abaixo.",
@@ -794,6 +800,7 @@
     "Theme installed description": "Este tema está aplicado às páginas de login do aplicativo.",
     "Theme preview note": "Campos vazios são mostrados com seus exemplos. Nada muda até você instalar.",
     "Uninstall": "Desinstalar",
+    "Uninstall action description": "Isso exclui o provedor de pagamento {name}. Os produtos que o usam não poderão mais ser pagos com ele.",
     "Uninstall app description": "O aplicativo {name} será excluído. Não será mais possível entrar no app com o Casdoor.",
     "Uninstall provider description": "O provedor {name} será excluído e removido do aplicativo ao qual foi adicionado.",
     "Uninstall theme description": "O aplicativo {name} voltará à aparência que tinha antes da instalação do tema.",
@@ -1240,6 +1247,7 @@
     "WeChat Pay": "Pagamento WeChat Pay"
   },
   "provider": {
+    "Action - Tooltip": "A ação instalada pelo Marketplace cujo código este provedor executa",
     "Advanced": "Avançado",
     "Agent ID": "ID do Agente",
     "Agent ID - Tooltip": "ID do agente",
@@ -1450,6 +1458,15 @@
     "UserInfo URL - Tooltip": "URL do UserInfo",
     "Web": "Cliente web",
     "admin (Shared)": "admin (Compartilhado)"
+  },
+  "radiusClient": {
+    "Bound organization": "Organização vinculada",
+    "Bound organization - Tooltip": "Se definido, este NAS só pode autenticar usuários desta organização e o atributo Class não pode escolher outra. Deixe vazio para continuar usando o atributo Class ou radiusDefaultOrganization",
+    "Edit RADIUS Client": "Editar cliente RADIUS",
+    "IP ranges": "Intervalos de IP",
+    "IP ranges - Tooltip": "Endereços IP de origem ou intervalos CIDR deste NAS, separados por vírgulas, p. ex. 192.168.20.50,10.0.0.0/24. Se vários clientes corresponderem, vence o intervalo mais específico",
+    "Shared secret": "Segredo compartilhado",
+    "Shared secret - Tooltip": "O segredo compartilhado RADIUS configurado neste NAS. Solicitações de IPs que não correspondem a nenhum cliente usam radiusSecret do app.conf"
   },
   "record": {
     "Is triggered": "Foi acionado",

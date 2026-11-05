@@ -513,6 +513,10 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/payment_adyen.svg`,
       url: "https://www.adyen.com/",
     },
+    "Plugin": {
+      logo: `${StaticBaseUrl}/img/social_custom.png`,
+      url: "",
+    },
   },
   Captcha: {
     "Default": {
@@ -1470,7 +1474,7 @@ export function isCustomOAuthType(type) {
 }
 
 export function getProviderLogoURL(provider) {
-  if (isCustomOAuthType(provider.type) && provider.customLogo) {
+  if ((isCustomOAuthType(provider.type) || provider.type === "Plugin") && provider.customLogo) {
     return provider.customLogo;
   }
   if (provider.category === "OAuth") {
@@ -1654,6 +1658,7 @@ export function getProviderTypeOptions(category) {
       {id: "FastSpring", name: "FastSpring"},
       {id: "Lemon Squeezy", name: "Lemon Squeezy"},
       {id: "Adyen", name: "Adyen"},
+      {id: "Plugin", name: "Plugin"},
     ]);
   } else if (category === "Captcha") {
     return ([
@@ -2591,6 +2596,11 @@ export function getForgetLink(application) {
     return `/forget/${application.name}`;
   }
   return application.forgetUrl;
+}
+
+/** The backend never signs anyone up into the built-in organization, whose members are global admins. */
+export function isSignupAllowed(application) {
+  return !!application?.enableSignUp && application.organization !== "built-in";
 }
 
 /** The OAuth params have to survive the hop, or the signup cannot hand back a code. */

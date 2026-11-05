@@ -624,6 +624,7 @@
     "Provider - Tooltip": "支払いプロバイダーを設定する必要があります。これには、PayPal、Alipay、WeChat Payなどが含まれます。",
     "QR Code": "QRコード",
     "QR code is too large": "QRコードが大きすぎます",
+    "RADIUS Clients": "RADIUS クライアント",
     "Records": "記録",
     "Refresh": "更新",
     "Request": "リクエスト",
@@ -767,7 +768,12 @@
     "Total users": "総ユーザー数"
   },
   "integration": {
+    "Action client secret help": "決済サービスから発行されたシークレットキーです。後でプロバイダーのページで入力することもできます。",
+    "Action install summary": "{name} の決済プロバイダーを追加します。そのコードは Casdoor 内のサンドボックスで実行され、許可されたホストにのみリクエストを送信できます。",
+    "Action installed description": "この決済プロバイダーはアクションを実行します。プロバイダーのページでキーを入力し、商品の決済プロバイダーに追加してください。",
     "Add to application help": "任意: このアプリケーションのサインインページにもプロバイダーを追加します。",
+    "Allowed hosts": "許可されたホスト",
+    "Allowed hosts help": "アクションがリクエストを送信できるのはこれらのホストだけです。ファイルやデータベースなど Casdoor の他の情報は読み取れません。",
     "App": "アプリ",
     "App install summary": "{name} に必要なリダイレクト URL を設定したアプリケーションを作成します。残りの手順はあなたの値を埋め込んだ設定ガイドで表示されます。",
     "App installed description": "この連携のためにこのアプリケーションが作成されました。以下の手順でアプリ側の設定を完了してください。",
@@ -794,6 +800,7 @@
     "Theme installed description": "このテーマはアプリケーションのサインインページに適用されています。",
     "Theme preview note": "未入力の項目は例の値でプレビューします。インストールするまで何も変わりません。",
     "Uninstall": "アンインストール",
+    "Uninstall action description": "決済プロバイダー {name} を削除します。これを使っている商品は、この方法で支払えなくなります。",
     "Uninstall app description": "アプリケーション {name} を削除します。以後、Casdoor でこのアプリにサインインできなくなります。",
     "Uninstall provider description": "プロバイダー {name} を削除し、追加先のアプリケーションからも外します。",
     "Uninstall theme description": "アプリケーション {name} の見た目をテーマのインストール前に戻します。",
@@ -1240,6 +1247,7 @@
     "WeChat Pay": "微信支付"
   },
   "provider": {
+    "Action - Tooltip": "このプロバイダーがコードを実行する、Marketplace からインストールしたアクション",
     "Advanced": "詳細設定",
     "Agent ID": "エージェントID",
     "Agent ID - Tooltip": "エージェントID",
@@ -1450,6 +1458,15 @@
     "UserInfo URL - Tooltip": "ユーザー情報URL",
     "Web": "ウェブ",
     "admin (Shared)": "管理者（共有）"
+  },
+  "radiusClient": {
+    "Bound organization": "紐付け組織",
+    "Bound organization - Tooltip": "設定すると、この NAS はこの組織のユーザーのみ認証でき、Class 属性で別の組織を指定できなくなります。空欄の場合は従来どおり Class 属性または radiusDefaultOrganization を使います",
+    "Edit RADIUS Client": "RADIUS クライアントを編集",
+    "IP ranges": "IP 範囲",
+    "IP ranges - Tooltip": "この NAS の送信元 IP アドレスまたは CIDR 範囲（カンマ区切り）。例: 192.168.20.50,10.0.0.0/24。複数のクライアントが一致する場合は最も狭い範囲が優先されます",
+    "Shared secret": "共有シークレット",
+    "Shared secret - Tooltip": "この NAS に設定した RADIUS 共有シークレット。どのクライアントにも一致しない IP からのリクエストは app.conf の radiusSecret を使います"
   },
   "record": {
     "Is triggered": "トリガーされました",
