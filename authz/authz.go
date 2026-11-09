@@ -91,6 +91,13 @@ p, *, *, POST, /api/set-password, *, *
 p, *, *, GET, /api/get-init-admin-status, *, *
 p, *, *, POST, /api/init-admin-password, *, *
 p, *, *, POST, /api/send-verification-code, *, *
+p, *, *, POST, /api/mfa/push/send, *, *
+p, *, *, GET, /api/get-user-personal-info, *, *
+p, *, *, GET, /api/get-mcp-records, *, *
+p, *, *, GET, /api/export-own-data, *, *
+p, *, *, POST, /api/delete-own-account, *, *
+p, *, *, GET, /api/mfa/push/challenge, *, *
+p, *, *, POST, /api/mfa/push/answer, *, *
 p, *, *, GET, /api/get-captcha, *, *
 p, *, *, POST, /api/verify-captcha, *, *
 p, *, *, POST, /api/verify-code, *, *
@@ -142,6 +149,7 @@ p, *, *, GET, /api/get-all-objects, *, *
 p, *, *, GET, /api/get-all-actions, *, *
 p, *, *, GET, /api/get-all-roles, *, *
 p, *, *, GET, /api/get-invitation-info, *, *
+p, *, *, GET, /api/get-license, *, *
 p, *, *, GET, /api/faceid-signin-begin, *, *
 p, *, *, GET, /api/kerberos-login, *, *
 p, *, *, POST, /api/grant-consent, *, *

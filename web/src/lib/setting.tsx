@@ -49,7 +49,23 @@ export const StaticBaseUrl = Conf.StaticBaseUrl;
 export const MAX_PAGE_SIZE = 25;
 export const SEARCH_DEBOUNCE_MS = 300;
 
+export const PricingUrl = "https://casdoor.cn/pricing";
+
+// the backend ends the message of a feature that needs a higher edition with " (<pricing page>)"
+const editionRequiredSuffix = ` (${PricingUrl})`;
+
 export function showMessage(type: "success" | "error" | "info" | "warning", text: string) {
+  if (type === "error" && typeof text === "string" && text.includes(editionRequiredSuffix)) {
+    toast.error(text.replace(editionRequiredSuffix, ""), {
+      duration: 15000,
+      action: {
+        label: i18next.t("general:View editions and pricing"),
+        onClick: () => window.open(PricingUrl, "_blank", "noopener,noreferrer"),
+      },
+    });
+    return;
+  }
+
   if (type === "success") {
     toast.success(text);
   } else if (type === "error") {
@@ -228,7 +244,7 @@ export function getThemeData(organization, application) {
   } else if (organization?.themeData?.isEnabled) {
     return organization.themeData;
   } else {
-    return Conf.ThemeDefault;
+    return Conf.getThemeDefault();
   }
 }
 
@@ -563,6 +579,10 @@ export const OtherProviderInfo = {
     },
   },
   Notification: {
+    "Plugin": {
+      logo: `${StaticBaseUrl}/img/social_custom.png`,
+      url: "",
+    },
     "Telegram": {
       logo: `${StaticBaseUrl}/img/social_telegram.png`,
       url: "https://telegram.org/",
@@ -1697,6 +1717,7 @@ export function getProviderTypeOptions(category) {
       {id: "Viber", name: "Viber"},
       {id: "CUCloud", name: "CUCloud"},
       {id: "WeCom", name: "WeCom"},
+      {id: "Plugin", name: "Plugin"},
     ]);
   } else if (category === "Face ID") {
     return ([
