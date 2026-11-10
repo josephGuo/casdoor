@@ -56,6 +56,10 @@ const editionRequiredSuffix = ` (${PricingUrl})`;
 
 export function showMessage(type: "success" | "error" | "info" | "warning", text: string) {
   if (type === "error" && typeof text === "string" && text.includes(editionRequiredSuffix)) {
+    if (Conf.HideUpgrades) {
+      toast.error(text.replace(editionRequiredSuffix, ""), {duration: 15000});
+      return;
+    }
     toast.error(text.replace(editionRequiredSuffix, ""), {
       duration: 15000,
       action: {
@@ -415,6 +419,10 @@ export const OtherProviderInfo = {
       logo: `${StaticBaseUrl}/img/email_resend.png`,
       url: "https://resend.com/",
     },
+    "Microsoft 365": {
+      logo: `${StaticBaseUrl}/img/social_microsoftonline.png`,
+      url: "https://learn.microsoft.com/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth",
+    },
   },
   Storage: {
     "Local File System": {
@@ -570,6 +578,10 @@ export const OtherProviderInfo = {
     "Cloudflare Turnstile": {
       logo: `${StaticBaseUrl}/img/social_cloudflare.png`,
       url: "https://www.cloudflare.com/products/turnstile/",
+    },
+    "ALTCHA": {
+      logo: `${StaticBaseUrl}/img/social_altcha.svg`,
+      url: "https://altcha.org",
     },
   },
   AI: {
@@ -1624,6 +1636,7 @@ export function getProviderTypeOptions(category) {
         {id: "SendGrid", name: "SendGrid"},
         {id: "Custom HTTP Email", name: "Custom HTTP Email"},
         {id: "Resend", name: "Resend"},
+        {id: "Microsoft 365", name: "Microsoft 365"},
       ]
     );
   } else if (category === "SMS") {
@@ -1699,6 +1712,7 @@ export function getProviderTypeOptions(category) {
       {id: "Aliyun Captcha", name: "Aliyun Captcha"},
       {id: "GEETEST", name: "GEETEST"},
       {id: "Cloudflare Turnstile", name: "Cloudflare Turnstile"},
+      {id: "ALTCHA", name: "ALTCHA"},
     ]);
   } else if (category === "Notification") {
     return ([
@@ -1844,7 +1858,7 @@ export function getProvidersRule(application, item) {
 // The login page offers a credential form, the sign-in providers or a QR panel; without any of them it has nothing to sign in with.
 export function hasAnySigninMethod(application) {
   if (isPasswordEnabled(application) || isCodeSigninEnabled(application) || isWebAuthnEnabled(application) ||
-    isLdapEnabled(application) || isFaceIdEnabled(application) || isMagicLinkEnabled(application)) {
+    isLdapEnabled(application) || isFaceIdEnabled(application) || isMagicLinkEnabled(application) || isCertLoginEnabled(application)) {
     return true;
   }
   const providersShown = (application?.signinItems ?? []).some(item => item.name === "Providers" && item.visible);
@@ -1888,6 +1902,10 @@ export function isFaceIdEnabled(application) {
 
 export function isMagicLinkEnabled(application) {
   return isSigninMethodEnabled(application, "Magic link");
+}
+
+export function isCertLoginEnabled(application) {
+  return isSigninMethodEnabled(application, "Certificate");
 }
 
 

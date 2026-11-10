@@ -5,11 +5,15 @@ import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert";
 import {Badge} from "@/components/ui/badge";
 import {Progress} from "@/components/ui/progress";
+import {Button} from "@/components/ui/button";
+import {Textarea} from "@/components/ui/textarea";
+import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
 import {ConfirmButton} from "@/components/common/ConfirmButton";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 import {Loading} from "@/components/common/Loading";
 import {PageHeader} from "@/components/crud/PageHeader";
 import * as SystemBackend from "@/backend/SystemInfo";
+import * as Conf from "@/Conf";
 import * as Setting from "@/lib/setting";
 import {getEditionText, PricingUrl} from "@/components/common/EditionNotice";
 import {EditionSwitcher, getEditionPreviewHint, isEditionPreviewEnabled} from "@/components/common/EditionPreview";
@@ -166,6 +170,8 @@ function UpgradeCard() {
 
   const status = info.status ?? {};
   const latestVersion: string = info.latestVersion ?? "";
+  const order = info.vendorOrder;
+  const targetVersion: string = order?.version || latestVersion;
   const inProgress = target !== "" || isUpgrading(status.state);
   const currentText = info.currentVersion
     ? `${info.currentVersion}${info.commitOffset > 0 ? ` (ahead+${info.commitOffset})` : ""}`
@@ -174,10 +180,10 @@ function UpgradeCard() {
   const upgrade = async() => {
     setLostMessage("");
     setReconnecting(false);
-    const res: any = await SystemBackend.upgradeSystem(latestVersion);
+    const res: any = await SystemBackend.upgradeSystem(targetVersion);
     if (res.status === "ok") {
-      setInfo({...info, status: {state: "downloading", version: latestVersion, downloaded: 0, total: 0, error: ""}});
-      setTarget(latestVersion);
+      setInfo({...info, status: {state: "downloading", version: targetVersion, downloaded: 0, total: 0, error: ""}});
+      setTarget(targetVersion);
     } else {
       Setting.showMessage("error", res.msg);
     }
@@ -206,7 +212,7 @@ function UpgradeCard() {
   };
 
   const renderUpgrade = () => {
-    if (!info.hasNewVersion) {
+    if (!info.hasNewVersion && !order) {
       return null;
     }
 
@@ -216,7 +222,7 @@ function UpgradeCard() {
           <p className="text-muted-foreground">
             {i18next.t("system:Casdoor runs in a container, pull the new image and recreate the container")}:
           </p>
-          <CommandBlock command={`docker pull casbin/casdoor:${latestVersion.replace(/^v/, "")}`} />
+          <CommandBlock command={`docker pull casbin/casdoor:${targetVersion.replace(/^v/, "")}`} />
         </div>
       );
     }
@@ -247,19 +253,39 @@ function UpgradeCard() {
     if (inProgress) {
       return renderProgress();
     }
-    if (!info.canUpgrade) {
+    if (order ? !order.canUpgrade : !info.canUpgrade) {
       return null;
     }
     return (
       <ConfirmButton
         size="sm"
         destructive={false}
-        title={`${i18next.t("system:Upgrade to")} ${latestVersion}?`}
+        title={`${i18next.t("system:Upgrade to")} ${targetVersion}?`}
         description={i18next.t("system:Casdoor will download the release from GitHub, verify its SHA-256 checksum, replace its binary and frontend and restart. The current version is kept in the backup folder next to the binary.")}
         onConfirm={upgrade}
       >
-        {i18next.t("system:Upgrade to")} {latestVersion}
+        {i18next.t("system:Upgrade to")} {targetVersion}
       </ConfirmButton>
+    );
+  };
+
+  const renderLastResult = () => {
+    const result = info.lastResult;
+    if (!result) {
+      return null;
+    }
+    const failed = result.state !== "succeeded";
+    const stateText = result.state === "succeeded" ? i18next.t("system:Succeeded") :
+      result.state === "rolledBack" ? i18next.t("system:Rolled back") : i18next.t("system:Upgrade failed");
+    const line = `${i18next.t("system:Last upgrade")}: ${result.from} → ${result.to}, ${stateText}, ${Setting.getFormattedDate(result.time)}`;
+    if (!failed) {
+      return <p className="text-muted-foreground">{line}</p>;
+    }
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>{line}</AlertTitle>
+        {result.error ? <AlertDescription>{result.error}</AlertDescription> : null}
+      </Alert>
     );
   };
 
@@ -267,7 +293,7 @@ function UpgradeCard() {
     <Card id="upgrade-card">
       <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 pb-3">
         <CardTitle className="text-base">{i18next.t("system:Version")}</CardTitle>
-        {info.hasNewVersion ? (
+        {info.hasNewVersion || order ? (
           <Badge variant="warning">{i18next.t("system:New version available")}</Badge>
         ) : latestVersion ? (
           <Badge variant="success">{i18next.t("system:Up to date")}</Badge>
@@ -311,7 +337,138 @@ function UpgradeCard() {
             <AlertDescription>{lostMessage}</AlertDescription>
           </Alert>
         ) : null}
+        {order ? (
+          <Alert>
+            <AlertTitle>{i18next.t("system:Casdoor support suggests upgrading to")} {order.version}</AlertTitle>
+            {order.note ? <AlertDescription>{order.note}</AlertDescription> : null}
+          </Alert>
+        ) : null}
+        {renderLastResult()}
+        {info.losesPaidFeatures ? (
+          <Alert variant="warning">
+            <AlertDescription>
+              {i18next.t("system:The license expired before this version was released, after upgrading to it the paid features and paid integrations are turned off")}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {renderUpgrade()}
+        {info.allowVendorUpgrade ? (
+          <p className="text-muted-foreground">{i18next.t("system:Casdoor support may upgrade this Casdoor by itself, set by allowVendorUpgrade in app.conf")}</p>
+        ) : null}
+        {info.deploymentType === "release" && !info.isUpgradeDisabled && !inProgress ? (
+          <OfflineUpgrade assetName={info.assetName} onStarted={(version: string) => {
+            setInfo({...info, status: {state: "installing", version: version, downloaded: 0, total: 0, error: ""}});
+            setTarget(version);
+          }} />
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Upgrades a Casdoor without Internet access from a release package and the offline upgrade order from Casdoor support. */
+function OfflineUpgrade({assetName, onStarted}: {assetName: string; onStarted: (version: string) => void}) {
+  const [order, setOrder] = React.useState("");
+  const [file, setFile] = React.useState<File | null>(null);
+  const [uploading, setUploading] = React.useState(false);
+
+  const getOrderVersion = () => {
+    try {
+      const payload = order.trim().split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
+      return JSON.parse(atob(payload)).version ?? "";
+    } catch {
+      return "";
+    }
+  };
+
+  const submit = async() => {
+    if (file === null) {
+      return;
+    }
+    setUploading(true);
+    const res: any = await SystemBackend.uploadUpgradePackage(order.trim(), file).catch((e: any) => ({status: "error", msg: `${e}`}));
+    setUploading(false);
+    if (res.status === "ok") {
+      onStarted(getOrderVersion());
+    } else {
+      Setting.showMessage("error", res.msg);
+    }
+  };
+
+  return (
+    <Collapsible>
+      <CollapsibleTrigger className="text-muted-foreground underline-offset-4 hover:underline">
+        {i18next.t("system:Offline upgrade")}
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-3 space-y-3">
+        <p className="text-muted-foreground">
+          {i18next.t("system:Offline upgrade - Tooltip")}
+          {assetName ? ` (${i18next.t("system:Package for this machine")}: ${assetName})` : ""}
+        </p>
+        <Textarea rows={3} className="font-mono text-xs" placeholder={i18next.t("system:Upgrade order")} value={order} onChange={(e) => setOrder(e.target.value)} />
+        <input type="file" accept=".tar.gz,.zip,.gz" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block text-sm" />
+        <Button size="sm" disabled={uploading || order.trim() === "" || file === null} onClick={submit}>
+          {uploading ? `${i18next.t("system:Uploading")}...` : i18next.t("system:Upload and upgrade")}
+        </Button>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/** The certificate sign-in port set in app.conf, shown only when it is. */
+function TlsListenersCard() {
+  const [listeners, setListeners] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    SystemBackend.getTlsListeners().then((res: any) => {
+      if (res.status === "ok" && Array.isArray(res.data)) {
+        setListeners(res.data);
+      }
+    });
+  }, []);
+
+  if (listeners.length === 0) {
+    return null;
+  }
+
+
+  return (
+    <Card id="tls-listeners-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">{i18next.t("system:Secure ports")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {listeners.map((listener: any) => (
+          <div key={listener.name} className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">{i18next.t("system:Certificate login port")}</span>
+              <span className="font-mono text-xs text-muted-foreground">:{listener.port}</span>
+              <Badge variant={listener.running ? "success" : "destructive"}>
+                {listener.running ? i18next.t("system:Listening") : i18next.t("system:Not started")}
+              </Badge>
+            </div>
+            {listener.certificates?.length ? (
+              <p className="text-xs text-muted-foreground">
+                {i18next.t("cert:Certificate")}: <span className="break-all font-mono">{listener.certificates.join(", ")}</span>
+              </p>
+            ) : null}
+            {listener.error ? (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {listener.error}
+                  {listener.code === "edition-required" && !Conf.HideUpgrades ? (
+                    <>
+                      {" "}
+                      <a href={PricingUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                        {i18next.t("general:Learn more")}
+                      </a>
+                    </>
+                  ) : null}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+          </div>
+        ))}
       </CardContent>
     </Card>
   );
@@ -332,6 +489,16 @@ function LicenseCard() {
     return null;
   }
 
+  const copyOfflineReport = () => {
+    SystemBackend.getLicenseReport().then((res: any) => {
+      if (res.status === "ok") {
+        Setting.copyToClipboard(res.data);
+      } else {
+        Setting.showMessage("error", res.msg);
+      }
+    });
+  };
+
   return (
     <Card id="license-card">
       <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 pb-3">
@@ -347,6 +514,41 @@ function LicenseCard() {
             <dd className="font-mono text-xs leading-5">{license.id}</dd>
             <dt className="text-muted-foreground">{i18next.t("general:Expire time")}</dt>
             <dd>{license.expireTime ? Setting.getFormattedDate(license.expireTime) : i18next.t("invitation:Never")}</dd>
+          </dl>
+        ) : null}
+        {license.id && license.expireTime ? (
+          <p className="text-muted-foreground">
+            {i18next.t("system:After the license expires, this version keeps its paid features, but the versions, new features and paid integration updates released after it are not included")}
+          </p>
+        ) : null}
+        {license.instanceId ? (
+          <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[max-content_1fr]">
+            <dt className="text-muted-foreground">{i18next.t("system:Instance ID")}</dt>
+            <dd className="font-mono text-xs leading-5">{license.instanceId}</dd>
+            {license.activationCode ? (
+              <>
+                <dt className="text-muted-foreground">{i18next.t("system:Activation code")}</dt>
+                <dd className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-mono text-xs">{license.activationCode}</span>
+                  <Button size="sm" variant="outline" onClick={() => Setting.copyToClipboard(license.activationCode)}>
+                    {i18next.t("general:Copy")}
+                  </Button>
+                </dd>
+              </>
+            ) : null}
+            {license.id && !license.error ? (
+              <>
+                <dt className="text-muted-foreground">{i18next.t("system:Offline report")}</dt>
+                <dd className="space-y-1">
+                  <Button size="sm" variant="outline" onClick={copyOfflineReport}>
+                    {i18next.t("general:Copy")}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {i18next.t("system:When this Casdoor cannot reach the license server, send this report to Casdoor support")}
+                  </p>
+                </dd>
+              </>
+            ) : null}
           </dl>
         ) : null}
         {license.error ? (
@@ -449,6 +651,7 @@ export default function SystemInfoPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <UpgradeCard />
         <LicenseCard />
+        <TlsListenersCard />
       </div>
 
       {/* Memory and disk are one meter each; the CPU card is as many meters as the

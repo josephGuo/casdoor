@@ -88,6 +88,10 @@ export const EditionFeatures: EditionFeature[] = [
     stop: {object: "server", label: "server:Token header"}},
   {id: "mcp-records", edition: "Commercial", category: "edition:AI agents", name: "edition:MCP tool call records", description: "edition:MCP tool call records - Description",
     stop: org("security", "application:Security", "organization:Record MCP tool calls")},
+  {id: "mcp-tool-permissions", edition: "Commercial", category: "edition:AI agents", name: "edition:Tool permissions for agents", description: "edition:Tool permissions for agents - Description",
+    stop: {object: "server", label: "server:Tool permissions"}},
+  {id: "mcp-identity", edition: "Commercial", category: "edition:AI agents", name: "edition:Identity and trace for MCP servers", description: "edition:Identity and trace for MCP servers - Description",
+    stop: {object: "server", label: "server:Identity header"}},
   {id: "id-jag", edition: "Commercial", category: "edition:AI agents", name: "edition:Identity assertion grants", description: "edition:Identity assertion grants - Description",
     stop: org("advanced", "provider:Advanced", "organization:Trusted ID-JAG issuers")},
 
@@ -107,9 +111,13 @@ export const EditionFeatures: EditionFeature[] = [
     stop: org("password", "general:Password type", "general:Password type")},
   {id: "sm4-fields", edition: "Enterprise", category: "edition:Chinese SM cryptography", name: "edition:SM4 field encryption", description: "edition:SM4 field encryption - Description",
     stop: org("enterprise", "general:Compliance", "organization:Encrypted fields")},
+  {id: "hsm", edition: "Enterprise", category: "edition:Keys and access control", name: "edition:Hardware security module", description: "edition:Hardware security module - Description",
+    stop: {object: "cert", label: "cert:Key storage"}},
 
   {id: "admin-separation", edition: "Enterprise", category: "edition:Administration and audit", name: "edition:Three-admin separation", description: "edition:Three-admin separation - Description",
     stop: org("enterprise", "general:Compliance", "organization:Separate the admins")},
+  {id: "delegated-admin", edition: "Enterprise", category: "edition:Administration and audit", name: "edition:Delegated administration", description: "edition:Delegated administration - Description",
+    stop: org("enterprise", "general:Compliance", undefined, "[data-tour='delegated-admins']")},
   {id: "tamper-proof", edition: "Enterprise", category: "edition:Administration and audit", name: "edition:Tamper-proof audit records", description: "edition:Tamper-proof audit records - Description",
     stop: org("enterprise", "general:Compliance", "organization:Tamper-proof records")},
   {id: "record-integrity", edition: "Enterprise", category: "edition:Administration and audit", name: "edition:Record integrity verification", description: "edition:Record integrity verification - Description",
@@ -119,14 +127,23 @@ export const EditionFeatures: EditionFeature[] = [
   {id: "siem", edition: "Enterprise", category: "edition:Administration and audit", name: "edition:CEF and LEEF log forwarding", description: "edition:CEF and LEEF log forwarding - Description",
     stop: {path: "/providers"}},
 
+  {id: "mcp-approval", edition: "Enterprise", category: "edition:AI agents", name: "edition:Approval of tool calls", description: "edition:Approval of tool calls - Description",
+    stop: {object: "server", label: "server:Needs approval"}},
+
   {id: "sod", edition: "Enterprise", category: "edition:Governance and compliance", name: "edition:Separation-of-duty rules", description: "edition:Separation-of-duty rules - Description",
     stop: org("enterprise", "general:Compliance", undefined, "[data-tour='sod-rules']")},
   {id: "governance", edition: "Enterprise", category: "edition:Governance and compliance", name: "edition:Orphan account cleanup", description: "edition:Orphan account cleanup - Description",
     stop: compliance("governance", "enterprise:Account governance")},
+  {id: "access-review", edition: "Enterprise", category: "edition:Governance and compliance", name: "edition:Access reviews", description: "edition:Access reviews - Description",
+    stop: {path: "/access-reviews", target: "#add-button"}},
   {id: "mlps", edition: "Enterprise", category: "edition:Governance and compliance", name: "edition:MLPS self-check", description: "edition:MLPS self-check - Description",
     stop: compliance("report", "enterprise:MLPS checklist")},
   {id: "security-overview", edition: "Enterprise", category: "edition:Governance and compliance", name: "edition:Security overview and monthly report", description: "edition:Security overview and monthly report - Description",
     stop: compliance("security", "enterprise:Security overview")},
+  {id: "security-screen", edition: "Enterprise", category: "edition:Governance and compliance", name: "edition:Security situation screen", description: "edition:Security situation screen - Description",
+    stop: {path: "/compliance", tab: "security", tabLabel: "enterprise:Security overview", target: "[data-tour='security-screen']"}},
+  {id: "security-report-word", edition: "Enterprise", category: "edition:Governance and compliance", name: "edition:Security report in Word", description: "edition:Security report in Word - Description",
+    stop: {path: "/compliance", tab: "security", tabLabel: "enterprise:Security overview", target: "[data-tour='security-report-word']"}},
   {id: "posture-score", edition: "Enterprise", category: "edition:Governance and compliance", name: "edition:Security score", description: "edition:Security score - Description",
     stop: {path: "/", target: "[data-tour='edition-hero']"}},
 
@@ -138,6 +155,12 @@ export const EditionFeatures: EditionFeature[] = [
     stop: marketplace("edition=Enterprise&q=idp")},
   {id: "id-verification", edition: "Enterprise", category: "edition:Enterprise connections", name: "edition:Real-name verification", description: "edition:Real-name verification - Description",
     stop: marketplace("edition=Enterprise&q=verification")},
+  {id: "form-fill", edition: "Enterprise", category: "edition:Enterprise connections", name: "edition:Legacy system form autofill", description: "edition:Legacy system form autofill - Description",
+    stop: app("form-fill", "application:Form autofill", "application:Enable form autofill")},
+  {id: "pam", edition: "Enterprise", category: "edition:Administration and audit", name: "edition:Privileged account management", description: "edition:Privileged account management - Description",
+    stop: {path: "/privileged-accounts"}},
+  {id: "cert-login", edition: "Enterprise", category: "edition:Enterprise connections", name: "edition:UKey and certificate login", description: "edition:UKey and certificate login - Description",
+    stop: org("enterprise", "general:Compliance", "organization:Enable certificate login")},
 ];
 
 export function getEditionFeatures(edition: PaidEdition): EditionFeature[] {

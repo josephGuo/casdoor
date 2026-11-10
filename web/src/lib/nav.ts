@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import * as Conf from "@/Conf";
 import * as Setting from "@/lib/setting";
+import {canDelegated, isDelegatedAdmin} from "@/lib/delegated-admin";
 import type {Account} from "@/hooks/use-account";
 
 export interface NavItem {
@@ -29,6 +30,8 @@ export interface NavGroup {
   to: string;
   items: NavItem[];
 }
+
+const EnterpriseOnlyPages = ["/access-reviews", "/privileged-accounts", "/privileged-access", "/compliance", "/mcp-approvals"];
 
 /** The console navigation, mirroring the antd ManagementPage menu. */
 export function getNavGroups(account: Account | null | undefined): NavGroup[] {
@@ -48,8 +51,33 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
       {key: "/shortcuts", label: i18next.t("general:Shortcuts")},
       {key: "/apps", label: i18next.t("general:Apps")},
       ...(Setting.isLocalAdminUser(account) ? [{key: "/editions", label: i18next.t("edition:Editions and features")}] : []),
+      ...(account.pendingAccessReviews > 0 ? [{key: "/my-access-reviews", label: i18next.t("enterprise:My access reviews")}] : []),
     ],
   });
+
+  // a delegated admin is offered only the pages of what they administer
+  if (isDelegatedAdmin(account)) {
+    groups.push({
+      key: "/orgs",
+      label: i18next.t("general:User Management"),
+      icon: LayoutGrid,
+      to: "/users",
+      items: [
+        {key: "/groups", label: i18next.t("general:Groups")},
+        {key: "/users", label: i18next.t("general:Users")},
+      ],
+    });
+    if (canDelegated(account, "applications")) {
+      groups.push({
+        key: "/identity",
+        label: i18next.t("general:Identity"),
+        icon: Lock,
+        to: "/applications",
+        items: [{key: "/applications", label: i18next.t("general:Applications")}],
+      });
+    }
+    return groups;
+  }
 
   groups.push({
     key: "/orgs",
@@ -88,12 +116,15 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
     items: [
       {key: "/roles", label: i18next.t("general:Roles")},
       {key: "/permissions", label: i18next.t("general:Permissions")},
+      {key: "/access-reviews", label: i18next.t("edition:Access reviews")},
       {key: "/models", label: i18next.t("general:Models")},
       {key: "/adapters", label: i18next.t("general:Adapters")},
       {key: "/enforcers", label: i18next.t("general:Enforcers")},
+      {key: "/privileged-accounts", label: i18next.t("pam:Privileged accounts")},
+      {key: "/privileged-access", label: i18next.t("pam:Privileged access")},
     ].filter(
       (item) =>
-        Setting.isLocalAdminUser(account) || !["/models", "/adapters", "/enforcers"].includes(item.key),
+        Setting.isLocalAdminUser(account) || !["/access-reviews", "/models", "/adapters", "/enforcers", "/privileged-accounts"].includes(item.key),
     ),
   });
 
@@ -105,6 +136,7 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
     items: [
       {key: "/agents", label: i18next.t("general:Agents")},
       {key: "/servers", label: i18next.t("general:MCP Servers")},
+      {key: "/mcp-approvals", label: i18next.t("server:Tool call approvals")},
       {key: "/server-store", label: i18next.t("general:MCP Store")},
       {key: "/entries", label: i18next.t("general:Entries")},
       {key: "/sites", label: i18next.t("general:Sites")},
@@ -175,6 +207,13 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
     to: Setting.isAdminUser(account) ? "/sysinfo" : "/syncers",
     items: adminItems,
   });
+
+  // an on-premise license is not offered the pages that only the enterprise edition has
+  if (Conf.isUpgradeHidden("Enterprise")) {
+    for (const group of groups) {
+      group.items = group.items.filter((item) => !EnterpriseOnlyPages.includes(item.key));
+    }
+  }
 
   return applyNavItems(groups, account);
 }

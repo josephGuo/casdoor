@@ -21,12 +21,14 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/beego/beego/v2/core/logs"
 	"github.com/casdoor/casdoor/conf"
+	"github.com/casdoor/casdoor/util"
 )
 
 const (
@@ -66,13 +68,32 @@ const (
 	FeatureOtpTokenImport   = "Hardware OTP token import"
 	FeaturePluginIdp        = "Identity provider plugins"
 	FeaturePluginIdv        = "ID verification plugins"
+	FeatureFormFill         = "Form autofill"
+	FeatureHsm              = "Hardware security module"
+	FeatureCertLogin        = "Certificate and UKey login"
+	FeaturePam              = "Privileged account management"
+	FeatureAccessReview     = "Access reviews"
+	FeatureDelegatedAdmin   = "Delegated administration"
+	FeatureMcpApproval      = "MCP tool call approval"
 )
 
+const KindOnPremise = "OnPremise"
+
+func getKind() string {
+	license, _, _ := getState()
+	if license == nil {
+		return ""
+	}
+	return license.Kind
+}
+
 // The features that a license can also grant on their own, without the edition they belong to, by these keys in its
-// "features", e.g. a community edition license with "features": ["rbac", "abac"]
+// "features", e.g. a community edition license with "features": ["rbac", "abac"], or a commercial edition license
+// with "features": ["form-fill"]
 var featureKeys = map[string]string{
-	FeatureRbac: "rbac",
-	FeatureAbac: "abac",
+	FeatureRbac:     "rbac",
+	FeatureAbac:     "abac",
+	FeatureFormFill: "form-fill",
 }
 
 var ranks = map[string]int{
@@ -94,19 +115,28 @@ type License struct {
 	InstanceId string `json:"instanceId,omitempty"`
 	// the license server that issued the license, where this instance reports to
 	Server string `json:"server,omitempty"`
+	// how the license was sold: "SaaS", "OnPremise", "Internal" or "Demo"
+	Kind string `json:"kind,omitempty"`
 }
 
 type LicenseInfo struct {
 	Edition    string   `json:"edition"`
 	Features   []string `json:"features,omitempty"`
+	Kind       string   `json:"kind,omitempty"`
 	Id         string   `json:"id,omitempty"`
 	Licensee   string   `json:"licensee,omitempty"`
 	IssuedTime string   `json:"issuedTime,omitempty"`
 	ExpireTime string   `json:"expireTime,omitempty"`
 	Error      string   `json:"error,omitempty"`
+	// the license has expired but still covers this version, which was released before it expired
+	UpdatesEnded bool `json:"updatesEnded,omitempty"`
+	// when the code of this build was committed, empty when Go did not record it
+	BuildTime string `json:"buildTime,omitempty"`
 	// for a global admin: this instance's ID and the code to send for an offline activation
 	InstanceId     string `json:"instanceId,omitempty"`
 	ActivationCode string `json:"activationCode,omitempty"`
+	// for a global admin: the upgrade the license server asks for
+	UpgradeOrder *UpgradeOrder `json:"upgradeOrder,omitempty"`
 }
 
 var (
@@ -121,6 +151,7 @@ var (
 
 func init() {
 	conf.SetEditionGetter(Get)
+	conf.SetHideUpgradesGetter(HidesUpgrades)
 }
 
 func mustDecodeBase64(s string) []byte {
@@ -212,8 +243,8 @@ func getState() (*License, string, error) {
 	if current == nil {
 		return nil, "", currentErr
 	}
-	if current.isExpired() {
-		return nil, "", fmt.Errorf("the license has expired")
+	if current.isExpired() && !current.coversBuild() {
+		return nil, "", current.getExpiredError()
 	}
 	if rejectedErr != nil {
 		return nil, "", rejectedErr
@@ -233,6 +264,70 @@ func (l *License) isExpired() bool {
 	}
 	expireTime, err := time.Parse(time.RFC3339, l.ExpireTime)
 	return err != nil || time.Now().After(expireTime)
+}
+
+// buildTime is when the code of this build was committed, which Go records when it builds from a git checkout with
+// the git command; without it, the HEAD commit of the checkout it was built from. A license keeps covering the
+// versions released before it expired: they keep their paid features for good, the versions released after it run
+// as the community edition
+var buildTime = getBuildTime()
+
+func getBuildTime() time.Time {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.time" {
+				t, err := time.Parse(time.RFC3339, setting.Value)
+				if err == nil {
+					return t
+				}
+			}
+		}
+	}
+	t, err := util.GetCommitTime()
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+func (l *License) coversTime(t time.Time) bool {
+	if l.ExpireTime == "" {
+		return true
+	}
+	expireTime, err := time.Parse(time.RFC3339, l.ExpireTime)
+	return err == nil && !t.IsZero() && !t.After(expireTime)
+}
+
+func (l *License) coversBuild() bool {
+	return l.coversTime(buildTime)
+}
+
+func (l *License) getExpiredError() error {
+	if buildTime.IsZero() {
+		return fmt.Errorf("the license expired at %s, and the release time of this build is unknown (build it from a git checkout)", l.ExpireTime)
+	}
+	released := buildTime
+	if expireTime, err := time.Parse(time.RFC3339, l.ExpireTime); err == nil {
+		released = buildTime.In(expireTime.Location())
+	}
+	return fmt.Errorf("the license expired at %s, and this version was released at %s, after it: only the versions released before the license expired keep the paid features", l.ExpireTime, released.Format(time.RFC3339))
+}
+
+// UpdatesEnded tells whether the license has expired but still covers this version
+func UpdatesEnded() bool {
+	license, _, _ := getState()
+	return license != nil && license.isExpired()
+}
+
+// CoversRelease tells whether a version released at releaseTime (RFC3339) would keep the paid features of the
+// license: false when the license has expired before it, or there is no license
+func CoversRelease(releaseTime string) bool {
+	license, _, _ := getState()
+	if license == nil {
+		return false
+	}
+	t, err := time.Parse(time.RFC3339, releaseTime)
+	return err == nil && license.coversTime(t)
 }
 
 func Get() string {
@@ -280,6 +375,13 @@ func FindRequired(message string) (*RequiredError, int, int) {
 	return required, match[0], match[1]
 }
 
+// HidesUpgrades tells whether the console should leave out the offers of higher editions: an on-premise deployment
+// bought its edition by contract and does not upgrade from the console, while a hosted instance can
+func HidesUpgrades() bool {
+	license, _, _ := getState()
+	return license != nil && license.Kind == KindOnPremise
+}
+
 // GetFeatures returns the features that the license grants on their own
 func GetFeatures() []string {
 	license, _, _ := getState()
@@ -316,7 +418,7 @@ func Require(edition string, feature string) error {
 
 func GetLicenseInfo() *LicenseInfo {
 	_, _, err := getState()
-	info := &LicenseInfo{Edition: Get(), Features: GetFeatures(), InstanceId: getInstanceId(), ActivationCode: GetActivationCode()}
+	info := &LicenseInfo{Edition: Get(), Features: GetFeatures(), Kind: getKind(), InstanceId: getInstanceId(), ActivationCode: GetActivationCode(), UpgradeOrder: GetUpgradeOrder()}
 	if err != nil {
 		info.Error = err.Error()
 	}
@@ -327,6 +429,10 @@ func GetLicenseInfo() *LicenseInfo {
 		info.Licensee = current.Licensee
 		info.IssuedTime = current.IssuedTime
 		info.ExpireTime = current.ExpireTime
+		info.UpdatesEnded = err == nil && current.isExpired()
+	}
+	if !buildTime.IsZero() {
+		info.BuildTime = buildTime.Format(time.RFC3339)
 	}
 	return info
 }

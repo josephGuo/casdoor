@@ -44,6 +44,16 @@ export function getLicense() {
   }).then(res => res.json());
 }
 
+export function getTlsListeners() {
+  return fetch(`${Setting.ServerUrl}/api/get-tls-listeners`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+  }).then(res => res.json());
+}
+
 export function getUpgradeInfo() {
   return fetch(`${Setting.ServerUrl}/api/get-upgrade-info`, {
     method: "GET",
@@ -61,6 +71,30 @@ export function upgradeSystem(version: string) {
     body: JSON.stringify({version}),
     headers: {
       "Content-Type": "application/json",
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+  }).then(res => res.json());
+}
+
+export function getLicenseReport() {
+  return fetch(`${Setting.ServerUrl}/api/get-license-report`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+  }).then(res => res.json());
+}
+
+export function uploadUpgradePackage(order: string, file: File) {
+  const formData = new FormData();
+  formData.append("order", order);
+  formData.append("file", file);
+  return fetch(`${Setting.ServerUrl}/api/upload-upgrade-package`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+    headers: {
       "Accept-Language": Setting.getAcceptLanguage(),
     },
   }).then(res => res.json());

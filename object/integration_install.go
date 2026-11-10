@@ -146,6 +146,9 @@ var actionKindCategories = map[string]string{
 	"syncer":             "",
 	"password-check":     "",
 	"password-migration": "",
+	"idp":                "OAuth",
+	"idv":                "ID Verification",
+	"cert":               "",
 }
 
 type IntegrationInstallRequest struct {

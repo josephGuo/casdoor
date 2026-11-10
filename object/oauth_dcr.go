@@ -176,7 +176,7 @@ func newDynamicClientApplication(req *DynamicClientRegistrationRequest, org *Org
 	// so that DCR-registered apps have a working sign-in method and correct branding out of the box.
 	var inheritedProviders []*ProviderItem
 	var inheritedSigninMethods []*SigninMethod
-	var inheritedLogo, inheritedFooterHtml, inheritedFormCss string
+	var inheritedLogo, inheritedFooterHtml, inheritedFormCss, inheritedCert string
 	var inheritedThemeData *ThemeData
 	var inheritedSigninItems []*SigninItem
 	var inheritedEnableSigninSession, inheritedEnableWebAuthn bool
@@ -184,6 +184,7 @@ func newDynamicClientApplication(req *DynamicClientRegistrationRequest, org *Org
 	if err == nil && defaultApp != nil {
 		inheritedProviders = defaultApp.Providers
 		inheritedSigninMethods = defaultApp.SigninMethods
+		inheritedCert = defaultApp.Cert
 		inheritedLogo = defaultApp.Logo
 		inheritedThemeData = defaultApp.ThemeData
 		inheritedFooterHtml = defaultApp.FooterHtml
@@ -224,6 +225,7 @@ func newDynamicClientApplication(req *DynamicClientRegistrationRequest, org *Org
 		EnableCodeSignin:     true,
 		EnableAutoSignin:     false,
 		EnableWebAuthn:       inheritedEnableWebAuthn,
+		Cert:                 inheritedCert,
 		TokenFormat:          org.DefaultTokenFormat,
 		TokenFields:          org.DefaultTokenFields,
 		ExpireInHours:        expireInHours,
@@ -327,6 +329,11 @@ func DeleteDynamicClient(app *Application) *DcrError {
 	}
 	if !affected {
 		return &DcrError{Error: "server_error", ErrorDescription: "failed to delete client"}
+	}
+
+	err = ExpireTokensByApplication(app.Owner, app.Name)
+	if err != nil {
+		return &DcrError{Error: "server_error", ErrorDescription: err.Error()}
 	}
 	return nil
 }

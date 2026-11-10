@@ -28,7 +28,9 @@ import (
 	"github.com/casdoor/casdoor/radius"
 	"github.com/casdoor/casdoor/routers"
 	"github.com/casdoor/casdoor/service"
+	"github.com/casdoor/casdoor/tlsserver"
 	"github.com/casdoor/casdoor/tracing"
+	"github.com/casdoor/casdoor/upgrade"
 	"github.com/casdoor/casdoor/util"
 )
 
@@ -41,6 +43,8 @@ func main() {
 }
 
 func runServer() {
+	upgrade.CheckPendingUpgrade()
+
 	web.BConfig.WebConfig.Session.SessionOn = true
 	web.BConfig.WebConfig.Session.SessionName = "casdoor_session_id"
 	if redisConfig := conf.GetRedisConfig(); redisConfig == nil {
@@ -93,6 +97,8 @@ func runServer() {
 	object.InitExpirePermissions()
 	object.InitUpdateSubscriptionStates()
 	object.InitSecurityPolicyJobs()
+	object.InitPrivilegedAccessJobs()
+	object.InitAccessReviewJobs()
 	tracing.Init()
 
 	object.InitSiteMap()
@@ -168,5 +174,7 @@ func runServer() {
 		service.Start()
 	}
 
-	web.RunWithMiddleWares(fmt.Sprintf(":%v", port), routers.BasePathMiddleware)
+	tlsserver.Start(port, routers.RequestPathMiddleware)
+
+	web.RunWithMiddleWares(fmt.Sprintf(":%v", port), routers.RequestPathMiddleware)
 }

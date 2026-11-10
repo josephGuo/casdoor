@@ -43,12 +43,17 @@ type EnterprisePolicy struct {
 	SodRules []*SodRule `json:"sodRules"`
 
 	RecordConsents bool `json:"recordConsents"`
+
+	DelegatedAdmins []*DelegatedAdmin `json:"delegatedAdmins"`
+	CertLogin       *CertLoginPolicy  `json:"certLogin"`
 }
 
-// SodRule says that no user may hold two or more of the roles at once, such as the requester and the approver
+// SodRule says that no user may hold two or more of the roles at once, such as the requester and the approver, and
+// that no agent may be allowed two or more of the MCP tools ("<server>/<tool>") at once, such as paying and approving
 type SodRule struct {
 	Name  string   `json:"name"`
 	Roles []string `json:"roles"`
+	Tools []string `json:"tools"`
 }
 
 const (
@@ -66,7 +71,17 @@ func (policy *EnterprisePolicy) isEmpty() bool {
 		return true
 	}
 	return !policy.SeparationOfDuties && len(policy.SystemAdmins) == 0 && len(policy.SecurityAdmins) == 0 && len(policy.AuditAdmins) == 0 &&
-		!policy.TamperProofRecords && len(policy.EncryptedFields) == 0 && len(policy.SodRules) == 0 && !policy.RecordConsents
+		!policy.TamperProofRecords && len(policy.EncryptedFields) == 0 && len(policy.SodRules) == 0 && !policy.RecordConsents &&
+		len(policy.DelegatedAdmins) == 0 && !policy.CertLogin.isEnabled()
+}
+
+// getPublic is the part of the policy that the sign-in pages need, the button of the certificate login, so that the
+// admin lists, separation-of-duty rules, delegated admins and trusted CAs aren't handed to anonymous visitors
+func (policy *EnterprisePolicy) getPublic() *EnterprisePolicy {
+	if policy == nil || policy.CertLogin == nil {
+		return nil
+	}
+	return &EnterprisePolicy{CertLogin: &CertLoginPolicy{Enabled: policy.CertLogin.Enabled, LoginUrl: policy.CertLogin.LoginUrl}}
 }
 
 // GetEnterprisePolicy returns the organization's enterprise policy, or nil when there is none or the license gives
@@ -138,9 +153,12 @@ func ValidateEnterprisePolicy(policy *EnterprisePolicy, editor *User, lang strin
 	if len(policy.EncryptedFields) > 0 && !IsFieldEncryptionKeyConfigured() {
 		return errors.New(i18n.Translate(lang, "enterprise:Set the configuration fieldEncryptionKey before encrypting personal fields"))
 	}
+	if err := validateCertLoginPolicy(policy.CertLogin, lang); err != nil {
+		return err
+	}
 	for _, rule := range policy.SodRules {
-		if rule == nil || rule.Name == "" || len(rule.Roles) < 2 {
-			return errors.New(i18n.Translate(lang, "enterprise:A separation-of-duty rule needs a name and at least two roles"))
+		if rule == nil || rule.Name == "" || (len(rule.Roles) < 2 && len(rule.Tools) < 2) {
+			return errors.New(i18n.Translate(lang, "enterprise:A separation-of-duty rule needs a name and at least two roles or two MCP tools"))
 		}
 	}
 	if !policy.SeparationOfDuties {
@@ -177,13 +195,15 @@ func (e *AdminDutyError) Error() string {
 
 var auditApiKeywords = []string{"record", "consent-log", "security-overview"}
 
-var securityApiObjects = []string{"permission", "permissions", "role", "roles", "model", "models", "enforcer", "enforcers", "adapter", "adapters", "cert", "certs"}
+var securityApiObjects = []string{"permission", "permissions", "role", "roles", "model", "models", "enforcer", "enforcers", "adapter", "adapters", "cert", "certs", "privileged-account", "privileged-accounts"}
 
 // selfServiceApis are the APIs every admin uses on their own account, whatever their duty
 var selfServiceApis = []string{
 	"/api/login", "/api/logout", "/api/signin", "/api/signout", "/api/sso-logout", "/api/set-password", "/api/mfa/",
 	"/api/send-verification-code", "/api/verify-code", "/api/set-preferred-mfa", "/api/delete-mfa", "/api/webauthn/",
-	"/api/upload-resource", "/api/get-account", "/api/userinfo",
+	"/api/upload-resource", "/api/get-account", "/api/userinfo", "/api/get-my-access-review-items", "/api/decide-access-review-items",
+	"/api/get-privileged-access", "/api/request-privileged-access", "/api/approve-privileged-request", "/api/reject-privileged-request",
+	"/api/cancel-privileged-request", "/api/return-privileged-request", "/api/reveal-privileged-password",
 }
 
 func isAuditApi(urlPath string) bool {
@@ -196,7 +216,7 @@ func isAuditApi(urlPath string) bool {
 }
 
 func isSecurityApi(urlPath string) bool {
-	if strings.Contains(urlPath, "-polic") || urlPath == "/api/rotate-cert" || urlPath == "/api/import-otp-devices" {
+	if strings.Contains(urlPath, "-polic") || urlPath == "/api/rotate-cert" || urlPath == "/api/import-otp-devices" || urlPath == "/api/rotate-privileged-account" || strings.HasSuffix(urlPath, "-access-review") {
 		return true
 	}
 	for _, prefix := range []string{"/api/add-", "/api/update-", "/api/delete-"} {

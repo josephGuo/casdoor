@@ -58,6 +58,10 @@ var secretRecordQueries = append([]string{"id_token_hint"}, secretRecordKeys...)
 var alwaysLoggedActions = map[string]bool{
 	"logout":     true,
 	"sso-logout": true,
+	// handing out the password of a managed account
+	"get-form-fill-account": true,
+	// handing out the password of a privileged account
+	"reveal-privileged-password": true,
 }
 
 func init() {

@@ -15,6 +15,7 @@
 package routers
 
 import (
+	"bytes"
 	stdcontext "context"
 	"encoding/json"
 	"fmt"
@@ -342,24 +343,71 @@ func getObjectFromBody(ctx *context.Context, path string) (string, string) {
 		return ctx.Request.Form.Get("owner"), ctx.Request.Form.Get("name")
 	}
 
+	if items, ok := getBodyItems(body); ok {
+		for _, item := range items {
+			owner, name, ok := getObjectFromJson(item, path)
+			if ok && owner != "" {
+				return owner, name
+			}
+		}
+		return ownerNameFromForm(ctx)
+	}
+
+	owner, name, ok := getObjectFromJson(body, path)
+	if !ok {
+		// Form-urlencoded, multipart, or other non-JSON body (common for web FormData).
+		return ownerNameFromForm(ctx)
+	}
+	return owner, name
+}
+
+func getObjectsFromBody(ctx *context.Context, path string) []Object {
+	items, ok := getBodyItems(ctx.Input.RequestBody)
+	if !ok {
+		return nil
+	}
+
+	objects := []Object{}
+	for _, item := range items {
+		owner, name, ok := getObjectFromJson(item, path)
+		if ok {
+			objects = append(objects, Object{Owner: owner, Name: name})
+		}
+	}
+	return objects
+}
+
+func getBodyItems(body []byte) ([]json.RawMessage, bool) {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 || trimmed[0] != '[' {
+		return nil, false
+	}
+
+	var items []json.RawMessage
+	if err := json.Unmarshal(trimmed, &items); err != nil {
+		return nil, false
+	}
+	return items, true
+}
+
+func getObjectFromJson(body []byte, path string) (string, string, bool) {
 	if checkIsOrgOwnerObject(path) && !strings.HasSuffix(path, "-organization") {
 		var objWithOrg ObjectWithOrg
 		err := json.Unmarshal(body, &objWithOrg)
 		if err != nil {
-			return ownerNameFromForm(ctx)
+			return "", "", false
 		}
-		return objWithOrg.Organization, objWithOrg.Name
+		return objWithOrg.Organization, objWithOrg.Name, true
 	}
 
 	var obj Object
 	err := json.Unmarshal(body, &obj)
 	if err != nil {
-		// Form-urlencoded, multipart, or other non-JSON body (common for web FormData).
-		return ownerNameFromForm(ctx)
+		return "", "", false
 	}
 
 	if strings.HasSuffix(path, "-organization") {
-		return obj.Name, obj.Name
+		return obj.Name, obj.Name, true
 	}
 
 	if path == "/api/delete-resource" {
@@ -369,7 +417,7 @@ func getObjectFromBody(ctx *context.Context, path string) (string, string) {
 		}
 	}
 
-	return obj.Owner, obj.Name
+	return obj.Owner, obj.Name, true
 }
 
 // getObjects returns every object the request may act on. The authorization layer
@@ -414,6 +462,10 @@ func getObjects(ctx *context.Context) ([]Object, error) {
 
 	bodyOwner, bodyName := getObjectFromBody(ctx, path)
 	objects = appendObject(objects, bodyOwner, bodyName)
+
+	for _, obj := range getObjectsFromBody(ctx, path) {
+		objects = appendObject(objects, obj.Owner, obj.Name)
+	}
 
 	formOwner, formName := ownerNameFromForm(ctx)
 	objects = appendObject(objects, formOwner, formName)
@@ -527,6 +579,14 @@ func getImpersonateUser(ctx *context.Context, subOwner, subName, username string
 
 func ApiFilter(ctx *context.Context) {
 	urlPath := getUrlPath(ctx)
+	// the MCP server has no SSE stream to open with GET, so the Streamable HTTP transport requires 405 for it
+	if urlPath == "/api/mcp" && ctx.Request.Method != http.MethodPost && ctx.Request.Method != http.MethodOptions {
+		ctx.Output.Header("Allow", http.MethodPost)
+		ctx.Output.SetStatus(http.StatusMethodNotAllowed)
+		ctx.Output.Body([]byte{})
+		return
+	}
+
 	// before the subject is read: it may sign out a session left by another application's token
 	if !checkDynamicClientSession(ctx, urlPath) {
 		return
@@ -584,6 +644,18 @@ func ApiFilter(ctx *context.Context) {
 			objOwner, objName = obj.Owner, obj.Name
 			break
 		}
+	}
+
+	// a delegated admin may administer the users, groups and applications in their scope, the controllers check
+	// the objects against the scope
+	scope, err := checkDelegatedAdmin(ctx, subOwner, subName, method, urlPath, objects)
+	if err != nil {
+		responseError(ctx, err.Error())
+		return
+	}
+	if scope != nil && !isAllowed {
+		isAllowed = true
+		objOwner, objName = objects[0].Owner, objects[0].Name
 	}
 
 	// the separation of the system, security and audit admins narrows what an allowed admin may do
@@ -672,7 +744,8 @@ func checkDynamicClientSession(ctx *context.Context, urlPath string) bool {
 		responseError(ctx, err.Error())
 		return false
 	}
-	if application == nil || isClientSessionApiAllowed(application, getSessionUser(ctx), urlPath) {
+	// the application is gone (e.g. a dynamic client deleted itself): the session can no longer be limited by it
+	if application != nil && isClientSessionApiAllowed(application, getSessionUser(ctx), urlPath) {
 		return true
 	}
 
@@ -699,8 +772,11 @@ func isRestrictedClientSession(ctx *context.Context) (bool, error) {
 	}
 
 	application, err := object.GetApplicationByClientId(aud)
-	if err != nil || application == nil {
+	if err != nil {
 		return false, err
+	}
+	if application == nil {
+		return true, nil
 	}
 	return !isClientSessionApiAllowed(application, getSessionUser(ctx), "/login/oauth/authorize"), nil
 }

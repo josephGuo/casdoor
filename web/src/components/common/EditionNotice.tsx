@@ -1,6 +1,9 @@
 import * as React from "react";
 import i18next from "i18next";
+import {Link} from "react-router-dom";
 import * as SystemBackend from "@/backend/SystemInfo";
+import * as Conf from "@/Conf";
+import * as Setting from "@/lib/setting";
 import {PricingUrl} from "@/lib/setting";
 
 export {PricingUrl};
@@ -9,9 +12,15 @@ const ranks: Record<string, number> = {Community: 0, Commercial: 1, Enterprise: 
 
 interface LicenseInfo {
   edition: string;
-  // the features the license grants on their own, e.g. "rbac" and "abac" for a community edition license
+  // the features the license grants on their own, e.g. "rbac" and "abac" for a community edition license,
+  // or "form-fill" for a commercial edition license
   features?: string[];
   error?: string;
+  expireTime?: string;
+  // the license has expired but still covers this version
+  updatesEnded?: boolean;
+  // for a global admin: the upgrade the license server asks for
+  upgradeOrder?: {version: string; note?: string};
 }
 
 let licensePromise: Promise<LicenseInfo> | null = null;
@@ -47,10 +56,15 @@ export function useEdition(): string | null {
   return useLicenseInfo()?.edition ?? null;
 }
 
-/** Whether a commercial edition feature is missing: false until the license is known, or when the license gives the edition or grants the feature by its key. */
-export function useFeatureMissing(featureKey: string): boolean {
+/** The features the license grants on their own, by their keys. */
+export function useLicenseFeatures(): string[] {
+  return useLicenseInfo()?.features ?? [];
+}
+
+/** Whether a paid feature is missing: false until the license is known, or when the license gives the edition or grants the feature by its key. */
+export function useFeatureMissing(featureKey: string, edition = "Commercial"): boolean {
   const info = useLicenseInfo();
-  return info !== null && info.edition === "Community" && !(info.features ?? []).includes(featureKey);
+  return info !== null && (ranks[info.edition] ?? 0) < ranks[edition] && !(info.features ?? []).includes(featureKey);
 }
 
 export function getEditionText(edition: string) {
@@ -73,9 +87,11 @@ export function EditionNotice({edition = "Commercial", message}: {edition?: stri
   return (
     <p className="mt-1.5 text-xs text-warning">
       {message ?? i18next.t("general:Commercial edition required")}{" "}
-      <a href={PricingUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-        {i18next.t("general:View editions and pricing")}
-      </a>
+      {Conf.isUpgradeHidden(edition) ? null : (
+        <a href={PricingUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+          {i18next.t("general:View editions and pricing")}
+        </a>
+      )}
     </p>
   );
 }
@@ -83,6 +99,28 @@ export function EditionNotice({edition = "Commercial", message}: {edition?: stri
 /** Tells the administrators of the console that the configured license is invalid or has expired, so the paid features are off. */
 export function LicenseBanner() {
   const info = useLicenseInfo();
+  if (!info?.error && info?.upgradeOrder) {
+    return (
+      <div className="border-b border-primary/30 bg-primary/5 px-4 py-2 text-sm md:px-6">
+        {i18next.t("system:Casdoor support suggests upgrading to")} {info.upgradeOrder.version}
+        {info.upgradeOrder.note ? `: ${info.upgradeOrder.note}` : ""}{" "}
+        <Link to="/sysinfo" className="font-medium underline underline-offset-2">
+          {i18next.t("system:Go to upgrade")}
+        </Link>
+      </div>
+    );
+  }
+  if (!info?.error && info?.updatesEnded) {
+    return (
+      <div className="border-b border-warning/40 bg-warning/10 px-4 py-2 text-sm text-warning md:px-6">
+        {i18next.t("system:The license has expired, this version keeps its paid features but gets no more upgrades or new features")}
+        {info.expireTime ? ` (${Setting.getFormattedDate(info.expireTime)})` : ""}{" "}
+        <a href={PricingUrl} target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+          {i18next.t("general:View editions and pricing")}
+        </a>
+      </div>
+    );
+  }
   if (!info?.error) {
     return null;
   }

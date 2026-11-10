@@ -6,7 +6,7 @@ import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent, CardHeader} from "@/components/ui/card";
 import {PageHeader} from "@/components/crud/PageHeader";
-import {getEditionText, PricingUrl, useEdition} from "@/components/common/EditionNotice";
+import {getEditionText, PricingUrl, useEdition, useLicenseFeatures} from "@/components/common/EditionNotice";
 import {getEditionDemoUrl, startEditionTour} from "@/components/common/EditionTour";
 import {
   type EditionFeature,
@@ -16,6 +16,7 @@ import {
   isEditionCovered,
   type PaidEdition,
 } from "@/lib/edition-features";
+import * as Conf from "@/Conf";
 import {cn} from "@/lib/utils";
 
 const objectLabels: Record<string, string> = {
@@ -116,7 +117,11 @@ function FeatureRow({feature, covered, highlighted, onTour}: {
 }
 
 function EditionSection({edition, current, highlighted}: {edition: PaidEdition; current: string | null; highlighted: string}) {
-  const features = getEditionFeatures(edition);
+  const grantedFeatures = useLicenseFeatures();
+  // when the enterprise section is left out, the enterprise features the license grants on their own show here
+  const features = edition === "Commercial" && Conf.isUpgradeHidden("Enterprise")
+    ? [...getEditionFeatures(edition), ...getEditionFeatures("Enterprise").filter((feature) => grantedFeatures.includes(feature.id))]
+    : getEditionFeatures(edition);
   const tourIds = features.filter((feature) => feature.stop).map((feature) => feature.id);
   const covered = current === null || isEditionCovered(current, edition);
   const demoUrl = covered ? undefined : getEditionDemoUrl(edition, `/editions?tour=${edition.toLowerCase()}`);
@@ -188,7 +193,7 @@ function EditionSection({edition, current, highlighted}: {edition: PaidEdition; 
                 <FeatureRow
                   key={feature.id}
                   feature={feature}
-                  covered={covered}
+                  covered={covered || grantedFeatures.includes(feature.id)}
                   highlighted={highlighted === feature.id}
                   onTour={() => startEditionTour(tourIds, tourIds.indexOf(feature.id))}
                 />
@@ -219,7 +224,7 @@ export default function EditionsPage() {
     const feature = getEditionFeature(tour);
     const target = edition ?? feature?.edition;
     navigate("/editions", {replace: true});
-    if (target) {
+    if (target && !Conf.isUpgradeHidden(target)) {
       const ids = getEditionFeatures(target).filter((item) => item.stop).map((item) => item.id);
       startEditionTour(ids, feature ? ids.indexOf(feature.id) : 0);
     }
@@ -243,18 +248,24 @@ export default function EditionsPage() {
                 {i18next.t("edition:Your edition")}: <span className="font-medium text-foreground">{getEditionText(current)}</span>
               </span>
             ) : null}
-            <Button asChild variant="outline">
-              <a href={PricingUrl} target="_blank" rel="noreferrer">
-                {i18next.t("general:View editions and pricing")}
-                <ArrowUpRight className="size-4" />
-              </a>
-            </Button>
+            {Conf.HideUpgrades ? null : (
+              <Button asChild variant="outline">
+                <a href={PricingUrl} target="_blank" rel="noreferrer">
+                  {i18next.t("general:View editions and pricing")}
+                  <ArrowUpRight className="size-4" />
+                </a>
+              </Button>
+            )}
           </>
         }
       />
-      <EditionSection edition="Commercial" current={current} highlighted={highlighted} />
-      <p className="text-sm text-muted-foreground">{i18next.t("edition:The enterprise edition includes every commercial feature, and adds")}</p>
-      <EditionSection edition="Enterprise" current={current} highlighted={highlighted} />
+      {Conf.isUpgradeHidden("Commercial") ? null : <EditionSection edition="Commercial" current={current} highlighted={highlighted} />}
+      {Conf.isUpgradeHidden("Enterprise") ? null : (
+        <>
+          <p className="text-sm text-muted-foreground">{i18next.t("edition:The enterprise edition includes every commercial feature, and adds")}</p>
+          <EditionSection edition="Enterprise" current={current} highlighted={highlighted} />
+        </>
+      )}
     </div>
   );
 }

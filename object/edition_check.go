@@ -34,6 +34,16 @@ func CheckApplicationEdition(application *Application) error {
 			return err
 		}
 	}
+	if application.IsCertLoginEnabled() {
+		if err := edition.Require(edition.Enterprise, edition.FeatureCertLogin); err != nil {
+			return err
+		}
+	}
+	if application.FormFill != nil && application.FormFill.Enabled {
+		if err := edition.Require(edition.Enterprise, edition.FeatureFormFill); err != nil {
+			return err
+		}
+	}
 	if edition.Has(edition.Commercial) {
 		return nil
 	}
@@ -97,11 +107,22 @@ func checkOrganizationEnterpriseEdition(organization *Organization) error {
 	if policy.RecordConsents {
 		return edition.Require(edition.Enterprise, edition.FeatureConsentLog)
 	}
+	if len(policy.DelegatedAdmins) > 0 {
+		return edition.Require(edition.Enterprise, edition.FeatureDelegatedAdmin)
+	}
+	if policy.CertLogin.isEnabled() {
+		return edition.Require(edition.Enterprise, edition.FeatureCertLogin)
+	}
 	return nil
 }
 
-// CheckCertEdition refuses SM2 certs without an enterprise edition license
+// CheckCertEdition refuses SM2 certs and the certs with the key in an HSM without an enterprise edition license
 func CheckCertEdition(cert *Cert) error {
+	if cert != nil && cert.IsHsmKey() {
+		if err := edition.Require(edition.Enterprise, edition.FeatureHsm); err != nil {
+			return err
+		}
+	}
 	if cert != nil && cert.CryptoAlgorithm == gm.Alg {
 		return edition.Require(edition.Enterprise, edition.FeatureGuomi)
 	}
