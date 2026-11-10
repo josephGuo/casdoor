@@ -53,6 +53,19 @@ const (
 	FeatureTracing          = "OpenTelemetry tracing"
 	FeatureRbac             = "Role-based access control (RBAC)"
 	FeatureAbac             = "Attribute-based access control (ABAC)"
+	FeatureGuomi            = "Chinese SM cryptographic algorithms"
+	FeatureSiemFormats      = "CEF and LEEF audit log formats"
+	FeatureAdminSeparation  = "Three-admin separation"
+	FeatureTamperProofLogs  = "Tamper-proof audit records"
+	FeatureFieldEncryption  = "Encrypted personal fields"
+	FeatureSod              = "Separation of duties"
+	FeatureConsentLog       = "Consent log"
+	FeatureGovernance       = "Account governance"
+	FeatureComplianceReport = "MLPS compliance checklist"
+	FeatureSecurityOverview = "Security dashboard and reports"
+	FeatureOtpTokenImport   = "Hardware OTP token import"
+	FeaturePluginIdp        = "Identity provider plugins"
+	FeaturePluginIdv        = "ID verification plugins"
 )
 
 // The features that a license can also grant on their own, without the edition they belong to, by these keys in its
@@ -77,6 +90,10 @@ type License struct {
 	IssuedTime string   `json:"issuedTime"`
 	ExpireTime string   `json:"expireTime"`
 	Features   []string `json:"features,omitempty"`
+	// set when the license was activated offline for one Casdoor instance (its database)
+	InstanceId string `json:"instanceId,omitempty"`
+	// the license server that issued the license, where this instance reports to
+	Server string `json:"server,omitempty"`
 }
 
 type LicenseInfo struct {
@@ -87,13 +104,19 @@ type LicenseInfo struct {
 	IssuedTime string   `json:"issuedTime,omitempty"`
 	ExpireTime string   `json:"expireTime,omitempty"`
 	Error      string   `json:"error,omitempty"`
+	// for a global admin: this instance's ID and the code to send for an offline activation
+	InstanceId     string `json:"instanceId,omitempty"`
+	ActivationCode string `json:"activationCode,omitempty"`
 }
 
 var (
 	loadOnce    sync.Once
+	stateMu     sync.RWMutex
 	current     *License
 	currentErr  error
 	currentText string
+	// set when the license server says the license was revoked or is bound to another instance
+	rejectedErr error
 )
 
 func init() {
@@ -176,8 +199,32 @@ func load() {
 			logs.Warn("license: %s, running as the %s edition", currentErr.Error(), Community)
 		} else {
 			logs.Info("license: %s edition licensed to %s, expires at %s", current.Edition, current.Licensee, current.ExpireTime)
+			go reportLoop()
 		}
 	})
+}
+
+// getState returns the license in effect, or nil with the reason it is not
+func getState() (*License, string, error) {
+	load()
+	stateMu.RLock()
+	defer stateMu.RUnlock()
+	if current == nil {
+		return nil, "", currentErr
+	}
+	if current.isExpired() {
+		return nil, "", fmt.Errorf("the license has expired")
+	}
+	if rejectedErr != nil {
+		return nil, "", rejectedErr
+	}
+	if current.InstanceId != "" {
+		instanceId := getInstanceId()
+		if instanceId != "" && instanceId != current.InstanceId {
+			return nil, "", fmt.Errorf("the license is activated for another Casdoor instance")
+		}
+	}
+	return current, currentText, nil
 }
 
 func (l *License) isExpired() bool {
@@ -189,21 +236,18 @@ func (l *License) isExpired() bool {
 }
 
 func Get() string {
-	load()
-	if current == nil || current.isExpired() {
+	license, _, _ := getState()
+	if license == nil {
 		return Community
 	}
-	return current.Edition
+	return license.Edition
 }
 
 // GetLicenseText returns the configured license when it is valid and not expired, for the Marketplace to send
 // when downloading a paid integration
 func GetLicenseText() string {
-	load()
-	if current == nil || current.isExpired() {
-		return ""
-	}
-	return currentText
+	_, text, _ := getState()
+	return text
 }
 
 func Has(edition string) bool {
@@ -238,11 +282,11 @@ func FindRequired(message string) (*RequiredError, int, int) {
 
 // GetFeatures returns the features that the license grants on their own
 func GetFeatures() []string {
-	load()
-	if current == nil || current.isExpired() {
+	license, _, _ := getState()
+	if license == nil {
 		return nil
 	}
-	return current.Features
+	return license.Features
 }
 
 // Allows tells whether the license gives the edition, or grants the feature on its own
@@ -271,19 +315,18 @@ func Require(edition string, feature string) error {
 }
 
 func GetLicenseInfo() *LicenseInfo {
-	load()
-	info := &LicenseInfo{Edition: Get(), Features: GetFeatures()}
-	if currentErr != nil {
-		info.Error = currentErr.Error()
+	_, _, err := getState()
+	info := &LicenseInfo{Edition: Get(), Features: GetFeatures(), InstanceId: getInstanceId(), ActivationCode: GetActivationCode()}
+	if err != nil {
+		info.Error = err.Error()
 	}
+	stateMu.RLock()
+	defer stateMu.RUnlock()
 	if current != nil {
 		info.Id = current.Id
 		info.Licensee = current.Licensee
 		info.IssuedTime = current.IssuedTime
 		info.ExpireTime = current.ExpireTime
-		if current.isExpired() {
-			info.Error = "the license has expired"
-		}
 	}
 	return info
 }

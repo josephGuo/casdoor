@@ -47,6 +47,7 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
       {key: "/", label: i18next.t("general:Dashboard")},
       {key: "/shortcuts", label: i18next.t("general:Shortcuts")},
       {key: "/apps", label: i18next.t("general:Apps")},
+      ...(Setting.isLocalAdminUser(account) ? [{key: "/editions", label: i18next.t("edition:Editions and features")}] : []),
     ],
   });
 
@@ -119,6 +120,7 @@ export function getNavGroups(account: Account | null | undefined): NavGroup[] {
     items: [
       {key: "/sessions", label: i18next.t("general:Sessions")},
       {key: "/records", label: i18next.t("general:Records")},
+      {key: "/compliance", label: i18next.t("general:Compliance")},
       {key: "/tokens", label: i18next.t("general:Tokens")},
       {key: "/verifications", label: i18next.t("general:Verifications")},
     ],
