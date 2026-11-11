@@ -131,6 +131,25 @@ func ownerNameFromForm(ctx *context.Context) (string, string) {
 	return ctx.Request.Form.Get("owner"), ctx.Request.Form.Get("name")
 }
 
+var provisioningObject = []string{
+	"/api/test-provisioning",
+	"/api/sync-provisioning",
+	"/api/retry-provisioning",
+	"/api/get-provisioned-accounts",
+	"/api/get-provisioning-tasks",
+}
+
+func getProvisioningObject(ctx *context.Context) (string, string, error) {
+	application, err := object.GetApplication(ctx.Input.Query("id"))
+	if err != nil {
+		return "", "", err
+	}
+	if application == nil {
+		return "", "", nil
+	}
+	return application.Organization, application.Name, nil
+}
+
 func checkIsOrgOwnerObject(urlPath string) bool {
 	for _, suffix := range orgOwnerObject {
 		if strings.HasSuffix(urlPath, suffix) || strings.Contains(urlPath, suffix+"s") {
@@ -220,6 +239,16 @@ func getRunSyncerObject(ctx *context.Context) (string, string, error) {
 func getObject(ctx *context.Context) (string, string, error) {
 	method := ctx.Request.Method
 	path := getRequestPath(ctx)
+
+	// an application row is owned by "admin", the provisioning of an application is authorized by its organization
+	if util.InSlice(provisioningObject, path) {
+		return getProvisioningObject(ctx)
+	}
+	// the controller imports the applications into the organization of the admin who uploads them
+	if path == "/api/upload-applications" {
+		owner, _ := util.GetOwnerAndNameFromIdNoCheck(getUsername(ctx))
+		return owner, "", nil
+	}
 
 	if strings.HasPrefix(path, "/api/server/") {
 		return ctx.Input.Param(":owner"), ctx.Input.Param(":name"), nil
@@ -427,7 +456,7 @@ func getObjectFromJson(body []byte, path string) (string, string, bool) {
 // of their own organization and executed against another organization's object.
 func getObjects(ctx *context.Context) ([]Object, error) {
 	path := getRequestPath(ctx)
-	if path == "/api/mcp" && ctx.Request.Method == http.MethodPost {
+	if object.IsBuiltinMcpPath(path) && ctx.Request.Method == http.MethodPost {
 		objects, err := getMcpObjects(ctx)
 		if err != nil {
 			return nil, err
@@ -508,6 +537,10 @@ func getUrlPath(ctx *context.Context) string {
 
 	if strings.HasPrefix(urlPath, "/scim") {
 		return "/scim"
+	}
+
+	if object.IsBuiltinMcpPath(urlPath) {
+		return "/api/mcp"
 	}
 
 	if strings.HasPrefix(urlPath, "/api/login/oauth") {
